@@ -97,7 +97,7 @@ struct WebsiteRulesView: View {
             } header: {
                 Text("Website rules")
             } footer: {
-                Text("Rules include subdomains. Sites outside a non-empty allow list use the focus buffer.")
+                Text("Rules include subdomains. Blocked sites and sites outside a non-empty allow list use the focus buffer.")
             }
         }
         .navigationTitle("Websites")

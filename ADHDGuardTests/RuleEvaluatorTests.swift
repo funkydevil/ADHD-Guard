@@ -46,7 +46,7 @@ final class RuleEvaluatorTests: XCTestCase {
         )
     }
 
-    func testBlockedWebsiteOverridesAllowedBrowser() {
+    func testBlockedWebsiteOverridesAllowedBrowserAndUsesBuffer() {
         let configuration = config(
             applications: [ApplicationRule(name: "Safari", bundleIdentifier: "com.apple.Safari", policy: .allowed)],
             websites: [WebsiteRule(host: "youtube.com", policy: .blocked)]
@@ -63,7 +63,7 @@ final class RuleEvaluatorTests: XCTestCase {
             ownBundleIdentifier: ownBundleIdentifier
         )
 
-        XCTAssertEqual(decision, .distracted(detail: "Blocked website: youtube.com", immediate: true))
+        XCTAssertEqual(decision, .distracted(detail: "Blocked website: youtube.com", immediate: false))
     }
 
     func testSupportedBrowsersAreAllowedByDefault() {
@@ -282,7 +282,7 @@ final class GuardSessionStateTests: XCTestCase {
         )
         XCTAssertEqual(
             episode.remaining(
-                for: .distracted(detail: "Blocked website", immediate: true),
+                for: .distracted(detail: "Blocked application", immediate: true),
                 now: start.addingTimeInterval(5),
                 graceSeconds: 20
             ),
@@ -341,7 +341,7 @@ final class GuardSessionStateTests: XCTestCase {
             isUserVisibleApplication: true
         )
         history.record(
-            decision: .distracted(detail: "Blocked website", immediate: true),
+            decision: .distracted(detail: "Blocked application", immediate: true),
             context: contextForHistory(name: "Safari", bundle: "com.apple.Safari"),
             processIdentifier: 42,
             isOwnApplication: false,

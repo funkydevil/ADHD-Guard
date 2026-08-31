@@ -15,7 +15,7 @@ enum RuleEvaluator {
             if let rule = matchingWebsiteRule(host: host, rules: configuration.websiteRules) {
                 switch rule.policy {
                 case .blocked:
-                    return .distracted(detail: "Blocked website: \(rule.host)", immediate: true)
+                    return .distracted(detail: "Blocked website: \(rule.host)", immediate: false)
                 case .allowed:
                     return .focused(detail: "Allowed website: \(rule.host)")
                 }

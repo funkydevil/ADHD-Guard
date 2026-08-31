@@ -1,6 +1,6 @@
 # ADHD Guard for macOS
 
-ADHD Guard watches the frontmost application and, for supported browsers, the active tab. It gives unlisted activity a configurable grace period and then opens an always-on-top warning that repeats a sound and spoken phrase. Explicitly blocked rules alert immediately.
+ADHD Guard watches the frontmost application and, for supported browsers, the active tab. Website distractions and unlisted applications receive a configurable grace period before an always-on-top warning repeats a sound and spoken phrase. Explicitly blocked applications alert immediately.
 
 The optional idle mode also warns when a focused application is open but there has been no keyboard or mouse input for the configured duration.
 
@@ -37,7 +37,7 @@ On first browser inspection, accept the macOS Automation prompt. If it was denie
 ## Rule priority
 
 1. ADHD Guard itself is always focused so its settings remain usable.
-2. A blocked website wins and alerts immediately.
+2. A blocked website wins and uses the configured grace period.
 3. An allowed website counts as focused, even if the browser is not separately allowed.
 4. When any allowed website exists, other readable browser sites use the grace period.
 5. Blocked applications alert immediately; allowed applications are focused.

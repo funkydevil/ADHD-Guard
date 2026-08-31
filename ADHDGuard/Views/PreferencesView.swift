@@ -41,7 +41,7 @@ struct PreferencesView: View {
                     in: 0...600,
                     step: 5
                 )
-                Text("Explicitly blocked rules ignore this timer and alert immediately.")
+                Text("Website distractions use this timer. Explicitly blocked applications still alert immediately.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
