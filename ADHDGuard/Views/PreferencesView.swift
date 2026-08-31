@@ -15,7 +15,6 @@ struct PreferencesView: View {
                         set: { launchAtLogin.setEnabled($0) }
                     )
                 )
-                .disabled(!launchAtLogin.isAvailable)
 
                 if launchAtLogin.requiresApproval {
                     LabeledContent {

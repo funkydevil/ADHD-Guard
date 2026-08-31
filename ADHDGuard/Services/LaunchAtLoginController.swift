@@ -2,18 +2,25 @@ import AppKit
 import Combine
 import ServiceManagement
 
+protocol LaunchAtLoginServicing {
+    var status: SMAppService.Status { get }
+    func register() throws
+    func unregister() throws
+}
+
+extension SMAppService: LaunchAtLoginServicing {}
+
 @MainActor
 final class LaunchAtLoginController: ObservableObject {
     @Published private(set) var isEnabled = false
-    @Published private(set) var isAvailable = true
     @Published private(set) var requiresApproval = false
     @Published private(set) var errorMessage: String?
 
-    private let service: SMAppService
+    private let service: any LaunchAtLoginServicing
     private var appActivationCancellable: AnyCancellable?
     private var requestedEnabled: Bool?
 
-    init(service: SMAppService = .mainApp) {
+    init(service: any LaunchAtLoginServicing = SMAppService.mainApp) {
         self.service = service
         refresh()
 
@@ -37,7 +44,7 @@ final class LaunchAtLoginController: ObservableObject {
             }
             refresh(clearResolvedError: true)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = registrationErrorMessage(for: error)
             refresh()
         }
     }
@@ -45,13 +52,10 @@ final class LaunchAtLoginController: ObservableObject {
     func refresh(clearResolvedError: Bool = false) {
         let status = service.status
         isEnabled = status == .enabled || status == .requiresApproval
-        isAvailable = status != .notFound
         requiresApproval = status == .requiresApproval
 
-        if status == .notFound {
-            errorMessage = "ADHD Guard could not access its Login Item registration. Try reinstalling the app."
-        } else if clearResolvedError,
-                  requestedEnabled.map({ $0 == isEnabled }) ?? true {
+        if clearResolvedError,
+           requestedEnabled.map({ $0 == isEnabled }) ?? true {
             errorMessage = nil
             requestedEnabled = nil
         }
@@ -59,5 +63,15 @@ final class LaunchAtLoginController: ObservableObject {
 
     func openLoginItemsSettings() {
         SMAppService.openSystemSettingsLoginItems()
+    }
+
+    private func registrationErrorMessage(for error: Error) -> String {
+        let installHint: String
+        if Bundle.main.bundleURL.path.hasPrefix("/Applications/") {
+            installHint = "Open Login Items in System Settings and try again."
+        } else {
+            installHint = "Move ADHD Guard to Applications, reopen it, and try again."
+        }
+        return "macOS could not update Start at Login. \(installHint) \(error.localizedDescription)"
     }
 }

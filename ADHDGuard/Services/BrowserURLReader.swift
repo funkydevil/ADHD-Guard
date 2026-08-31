@@ -57,6 +57,74 @@ enum BrowserURLReader {
         }
         return .success(url)
     }
+
+    static func activateExistingTab(url: URL, for descriptor: BrowserDescriptor) -> Bool {
+        guard let source = tabActivationScript(for: descriptor, url: url),
+              let script = NSAppleScript(source: source) else {
+            return false
+        }
+
+        var error: NSDictionary?
+        let result = script.executeAndReturnError(&error)
+        return error == nil && result.booleanValue
+    }
+
+    static func tabActivationScript(for descriptor: BrowserDescriptor, url: URL) -> String? {
+        let targetURL = escapedAppleScriptString(url.absoluteString)
+
+        if descriptor.bundleIdentifier == "com.apple.Safari" {
+            return """
+            set targetURL to "\(targetURL)"
+            tell application "Safari"
+                repeat with windowIndex from 1 to count of windows
+                    set candidateWindow to window windowIndex
+                    repeat with tabIndex from 1 to count of tabs of candidateWindow
+                        set candidateTab to tab tabIndex of candidateWindow
+                        if URL of candidateTab is targetURL then
+                            set current tab of candidateWindow to candidateTab
+                            set index of candidateWindow to 1
+                            activate
+                            return true
+                        end if
+                    end repeat
+                end repeat
+            end tell
+            return false
+            """
+        }
+
+        let chromiumBundleIdentifiers = [
+            "com.google.Chrome",
+            "com.microsoft.edgemac",
+            "com.brave.Browser",
+            "company.thebrowser.Browser"
+        ]
+        guard chromiumBundleIdentifiers.contains(descriptor.bundleIdentifier) else { return nil }
+
+        return """
+        set targetURL to "\(targetURL)"
+        tell application "\(descriptor.applicationName)"
+            repeat with windowIndex from 1 to count of windows
+                set candidateWindow to window windowIndex
+                repeat with tabIndex from 1 to count of tabs of candidateWindow
+                    if URL of tab tabIndex of candidateWindow is targetURL then
+                        set active tab index of candidateWindow to tabIndex
+                        set index of candidateWindow to 1
+                        activate
+                        return true
+                    end if
+                end repeat
+            end repeat
+        end tell
+        return false
+        """
+    }
+
+    private static func escapedAppleScriptString(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+    }
 }
 
 enum BrowserReadError: LocalizedError, Equatable {

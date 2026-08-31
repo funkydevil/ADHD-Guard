@@ -88,3 +88,36 @@ struct RecentApplicationHistory: Equatable {
         applications = Array(applications.prefix(limit))
     }
 }
+
+struct FocusReturnTarget: Equatable {
+    let processIdentifier: pid_t
+    let applicationName: String
+    let bundleIdentifier: String
+    let browserURL: URL?
+}
+
+struct FocusReturnHistory: Equatable {
+    private(set) var target: FocusReturnTarget?
+
+    mutating func record(
+        decision: RuleDecision,
+        context: ActivityContext,
+        processIdentifier: pid_t,
+        isOwnApplication: Bool,
+        isUserVisibleApplication: Bool
+    ) {
+        guard case .focused = decision,
+              !isOwnApplication,
+              isUserVisibleApplication,
+              !context.bundleIdentifier.hasPrefix("unknown.") else {
+            return
+        }
+
+        target = FocusReturnTarget(
+            processIdentifier: processIdentifier,
+            applicationName: context.applicationName,
+            bundleIdentifier: context.bundleIdentifier,
+            browserURL: context.isBrowser ? context.browserURL : nil
+        )
+    }
+}

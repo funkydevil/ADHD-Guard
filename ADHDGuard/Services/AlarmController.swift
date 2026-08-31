@@ -18,6 +18,7 @@ final class AlarmController: NSObject, ObservableObject, NSWindowDelegate {
     private var screenParametersCancellable: AnyCancellable?
     private var repeatTask: Task<Void, Never>?
     private var previewTask: Task<Void, Never>?
+    private var returnToFocusAction: (() -> Void)?
 
     override init() {
         super.init()
@@ -36,8 +37,10 @@ final class AlarmController: NSObject, ObservableObject, NSWindowDelegate {
         message: String,
         phrase: String,
         speaks: Bool,
-        playsSound: Bool
+        playsSound: Bool,
+        returnToFocus: @escaping () -> Void
     ) {
+        returnToFocusAction = returnToFocus
         if let activeAlarm,
            activeAlarm.kind == kind,
            activeAlarm.message == message {
@@ -65,6 +68,7 @@ final class AlarmController: NSObject, ObservableObject, NSWindowDelegate {
         speechSynthesizer.stopSpeaking()
         panels.values.forEach { $0.orderOut(nil) }
         activeAlarm = nil
+        returnToFocusAction = nil
     }
 
     func preview(phrase: String, speaks: Bool, playsSound: Bool) {
@@ -94,7 +98,17 @@ final class AlarmController: NSObject, ObservableObject, NSWindowDelegate {
                 panels[identifier] = panel
                 panelScreenIdentifiers[ObjectIdentifier(panel)] = identifier
             }
-            panel.contentView = DraggableHostingView(rootView: AlarmOverlayView(alarm: alarm))
+            let returnToFocus = { [weak self] in
+                self?.returnToFocusAction?()
+                return
+            }
+            panel.contentView = DraggableHostingView(
+                rootView: AlarmOverlayView(
+                    alarm: alarm,
+                    onReturnToFocus: returnToFocus
+                ),
+                onClick: returnToFocus
+            )
             position(panel, on: screen, identifier: identifier)
             panel.orderFrontRegardless()
         }
@@ -289,5 +303,44 @@ final class AlarmController: NSObject, ObservableObject, NSWindowDelegate {
 }
 
 private final class DraggableHostingView<Content: View>: NSHostingView<Content> {
-    override var mouseDownCanMoveWindow: Bool { true }
+    private let onClick: () -> Void
+
+    init(rootView: Content, onClick: @escaping () -> Void) {
+        self.onClick = onClick
+        super.init(rootView: rootView)
+    }
+
+    @available(*, unavailable)
+    required init(rootView: Content) {
+        fatalError("init(rootView:) is unavailable")
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is unavailable")
+    }
+
+    override var mouseDownCanMoveWindow: Bool { false }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let window else { return }
+        let originalOrigin = window.frame.origin
+        window.performDrag(with: event)
+
+        if AlarmPointerInteraction.isClick(
+            from: originalOrigin,
+            to: window.frame.origin
+        ) {
+            onClick()
+        }
+    }
+}
+
+enum AlarmPointerInteraction {
+    static func isClick(from originalOrigin: NSPoint, to currentOrigin: NSPoint) -> Bool {
+        hypot(
+            currentOrigin.x - originalOrigin.x,
+            currentOrigin.y - originalOrigin.y
+        ) < 2
+    }
 }

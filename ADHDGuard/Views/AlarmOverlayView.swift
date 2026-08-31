@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AlarmOverlayView: View {
     let alarm: AlarmPresentation
+    let onReturnToFocus: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -42,7 +43,8 @@ struct AlarmOverlayView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(alarm.title). \(alarm.message)")
-        .accessibilityHint("Drag to move. \(instruction)")
+        .accessibilityHint("Click to return to your last focused context. Drag to move. \(instruction)")
+        .accessibilityAction(named: "Return to last focused context", onReturnToFocus)
     }
 
     private var backgroundColor: Color {
@@ -54,9 +56,9 @@ struct AlarmOverlayView: View {
     private var instruction: String {
         switch alarm.kind {
         case .distraction:
-            "Allowed context silences this alert"
+            "Click to return • Drag to move"
         case .idle:
-            "Activity silences this alert"
+            "Click to return • Drag to move"
         case .test:
             "Preview"
         }

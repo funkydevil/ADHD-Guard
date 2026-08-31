@@ -1,3 +1,4 @@
+import ServiceManagement
 import XCTest
 @testable import ADHDGuard
 
@@ -287,6 +288,157 @@ final class GuardSessionStateTests: XCTestCase {
             ]
         )
     }
+
+    func testFocusReturnHistoryKeepsLastFocusedExternalContext() {
+        var history = FocusReturnHistory()
+        let focusedContext = ActivityContext(
+            applicationName: "Safari",
+            bundleIdentifier: "com.apple.Safari",
+            browserURL: URL(string: "https://developer.apple.com/documentation"),
+            isBrowser: true,
+            idleSeconds: 0
+        )
+
+        history.record(
+            decision: .focused(detail: "Allowed website"),
+            context: focusedContext,
+            processIdentifier: 42,
+            isOwnApplication: false,
+            isUserVisibleApplication: true
+        )
+        history.record(
+            decision: .distracted(detail: "Blocked website", immediate: true),
+            context: contextForHistory(name: "Safari", bundle: "com.apple.Safari"),
+            processIdentifier: 42,
+            isOwnApplication: false,
+            isUserVisibleApplication: true
+        )
+
+        XCTAssertEqual(
+            history.target,
+            FocusReturnTarget(
+                processIdentifier: 42,
+                applicationName: "Safari",
+                bundleIdentifier: "com.apple.Safari",
+                browserURL: URL(string: "https://developer.apple.com/documentation")
+            )
+        )
+    }
+
+    func testFocusReturnHistoryIgnoresADHDGuardItself() {
+        var history = FocusReturnHistory()
+        history.record(
+            decision: .focused(detail: "ADHD Guard settings"),
+            context: contextForHistory(name: "ADHD Guard", bundle: "com.funkydevil.ADHDGuard"),
+            processIdentifier: 7,
+            isOwnApplication: true,
+            isUserVisibleApplication: true
+        )
+
+        XCTAssertNil(history.target)
+    }
+
+    func testBrowserTabActivationScriptEscapesURLAndTargetsBrowser() throws {
+        let descriptor = try XCTUnwrap(BrowserURLReader.descriptor(for: "com.google.Chrome"))
+        let url = try XCTUnwrap(URL(string: "https://example.com/search?q=%22focus%22"))
+        let script = try XCTUnwrap(BrowserURLReader.tabActivationScript(for: descriptor, url: url))
+
+        XCTAssertTrue(script.contains("tell application \"Google Chrome\""))
+        XCTAssertTrue(script.contains(url.absoluteString))
+        XCTAssertTrue(script.contains("set active tab index"))
+    }
+
+    func testAlarmPointerInteractionDistinguishesClickFromDrag() {
+        XCTAssertTrue(
+            AlarmPointerInteraction.isClick(
+                from: CGPoint(x: 100, y: 100),
+                to: CGPoint(x: 101, y: 100)
+            )
+        )
+        XCTAssertFalse(
+            AlarmPointerInteraction.isClick(
+                from: CGPoint(x: 100, y: 100),
+                to: CGPoint(x: 103, y: 100)
+            )
+        )
+    }
+
+    private func contextForHistory(name: String, bundle: String) -> ActivityContext {
+        ActivityContext(
+            applicationName: name,
+            bundleIdentifier: bundle,
+            browserURL: nil,
+            isBrowser: false,
+            idleSeconds: 0
+        )
+    }
+}
+
+@MainActor
+final class LaunchAtLoginControllerTests: XCTestCase {
+    func testNotFoundStatusDoesNotShowAnErrorBeforeRegistrationIsAttempted() {
+        let service = LaunchAtLoginServiceFake(status: .notFound)
+        let controller = LaunchAtLoginController(service: service)
+
+        XCTAssertFalse(controller.isEnabled)
+        XCTAssertNil(controller.errorMessage)
+    }
+
+    func testNotFoundStatusCanRecoverByRegistering() {
+        let service = LaunchAtLoginServiceFake(status: .notFound)
+        service.statusAfterRegister = .enabled
+        let controller = LaunchAtLoginController(service: service)
+
+        controller.setEnabled(true)
+
+        XCTAssertEqual(service.registerCallCount, 1)
+        XCTAssertTrue(controller.isEnabled)
+        XCTAssertNil(controller.errorMessage)
+    }
+
+    func testRegistrationFailureShowsAnActionableErrorOnlyAfterAttempt() {
+        let service = LaunchAtLoginServiceFake(status: .notFound)
+        service.registerError = LaunchAtLoginTestError.denied
+        let controller = LaunchAtLoginController(service: service)
+
+        controller.setEnabled(true)
+
+        XCTAssertEqual(service.registerCallCount, 1)
+        XCTAssertFalse(controller.isEnabled)
+        XCTAssertTrue(controller.errorMessage?.contains("macOS could not update Start at Login") == true)
+        XCTAssertTrue(controller.errorMessage?.contains("Applications") == true)
+    }
+}
+
+private final class LaunchAtLoginServiceFake: LaunchAtLoginServicing {
+    var status: SMAppService.Status
+    var statusAfterRegister: SMAppService.Status?
+    var registerError: Error?
+    private(set) var registerCallCount = 0
+
+    init(status: SMAppService.Status) {
+        self.status = status
+    }
+
+    func register() throws {
+        registerCallCount += 1
+        if let registerError {
+            throw registerError
+        }
+        if let statusAfterRegister {
+            status = statusAfterRegister
+        }
+    }
+
+    func unregister() throws {
+        status = .notRegistered
+    }
+}
+
+private enum LaunchAtLoginTestError: LocalizedError {
+    case denied
+
+    var errorDescription: String? { "Registration denied" }
 }
 
 @MainActor

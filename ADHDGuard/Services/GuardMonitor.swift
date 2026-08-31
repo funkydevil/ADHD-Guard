@@ -18,6 +18,7 @@ final class GuardMonitor: ObservableObject {
     private var distractionEpisode = DistractionEpisode()
     private var recentHostHistory = RecentHostHistory()
     private var recentApplicationHistory = RecentApplicationHistory()
+    private var focusReturnHistory = FocusReturnHistory()
     private var lastBrowserReadAt = Date.distantPast
     private var cachedBrowserURL: URL?
     private var cachedBrowserBundleIdentifier: String?
@@ -90,6 +91,13 @@ final class GuardMonitor: ObservableObject {
             ownBundleIdentifier: Bundle.main.bundleIdentifier ?? "com.funkydevil.ADHDGuard"
         )
         lastDecision = decision
+        focusReturnHistory.record(
+            decision: decision,
+            context: context,
+            processIdentifier: application.processIdentifier,
+            isOwnApplication: isOwnApplication,
+            isUserVisibleApplication: application.activationPolicy == .regular
+        )
         apply(decision: decision, context: context, configuration: configuration)
     }
 
@@ -140,7 +148,8 @@ final class GuardMonitor: ObservableObject {
                     message: "No keyboard or mouse activity for \(Int(context.idleSeconds)) seconds.",
                     phrase: configuration.idlePhrase,
                     speaks: configuration.speaksWarnings,
-                    playsSound: configuration.playsSound
+                    playsSound: configuration.playsSound,
+                    returnToFocus: { [weak self] in self?.returnToLastFocusedContext() }
                 )
             } else {
                 statusText = detail
@@ -163,7 +172,8 @@ final class GuardMonitor: ObservableObject {
                     message: alarmMessage(from: detail),
                     phrase: configuration.focusPhrase,
                     speaks: configuration.speaksWarnings,
-                    playsSound: configuration.playsSound
+                    playsSound: configuration.playsSound,
+                    returnToFocus: { [weak self] in self?.returnToLastFocusedContext() }
                 )
             } else {
                 statusText = "Distraction: \(remaining)s remaining"
@@ -175,6 +185,46 @@ final class GuardMonitor: ObservableObject {
     private func resetDistraction() {
         distractionEpisode.reset()
         distractionRemaining = nil
+    }
+
+    private func returnToLastFocusedContext() {
+        guard let target = focusReturnHistory.target else { return }
+
+        let workspace = NSWorkspace.shared
+        let runningApplication = NSRunningApplication(processIdentifier: target.processIdentifier)
+            .flatMap { application in
+                application.bundleIdentifier?.caseInsensitiveCompare(target.bundleIdentifier) == .orderedSame
+                    ? application
+                    : nil
+            }
+        let applicationURL = runningApplication?.bundleURL
+            ?? workspace.urlForApplication(withBundleIdentifier: target.bundleIdentifier)
+
+        if let browserURL = target.browserURL,
+           let descriptor = BrowserURLReader.descriptor(for: target.bundleIdentifier) {
+            if BrowserURLReader.activateExistingTab(url: browserURL, for: descriptor) {
+                return
+            }
+
+            if let applicationURL {
+                let configuration = NSWorkspace.OpenConfiguration()
+                configuration.activates = true
+                workspace.open(
+                    [browserURL],
+                    withApplicationAt: applicationURL,
+                    configuration: configuration
+                )
+                return
+            }
+        }
+
+        if let runningApplication {
+            runningApplication.activate(options: [.activateAllWindows])
+        } else if let applicationURL {
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = true
+            workspace.openApplication(at: applicationURL, configuration: configuration)
+        }
     }
 
     private func recordRecentHostIfNeeded(context: ActivityContext) {

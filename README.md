@@ -11,7 +11,8 @@ The optional idle mode also warns when a focused application is open but there h
 - Supported browsers are allowed as applications by default; their readable active sites are still evaluated first.
 - A configurable distraction grace period.
 - Idle detection and a separate idle phrase.
-- A compact, click-through focus banner across Spaces, a gentle reminder chime, and an optional spoken warning.
+- A compact, interactive focus banner across Spaces, a gentle reminder chime, and an optional spoken warning.
+- Clicking a warning returns to the last allowed app or browser tab; if that tab was closed, the saved in-memory URL opens in the same browser.
 - A menu bar control plus a full SwiftUI dashboard.
 - Three recent browser hosts for one-click blocking during the current app session.
 - Three recent active applications for one-click allowing during the current app session.
@@ -28,6 +29,8 @@ Open `ADHDGuard.xcodeproj`, select the `ADHDGuard` scheme, and run the app. You 
 xcodebuild -project ADHDGuard.xcodeproj -scheme ADHDGuard -destination 'platform=macOS' build
 xcodebuild -project ADHDGuard.xcodeproj -scheme ADHDGuard -destination 'platform=macOS' test
 ```
+
+`Start at login` uses the macOS 13+ Service Management API. For a daily-use build, place `ADHDGuard.app` in `/Applications` before enabling it; an Xcode DerivedData build can be moved or replaced between launches and is not a stable login-item location.
 
 On first browser inspection, accept the macOS Automation prompt. If it was denied, open **System Settings → Privacy & Security → Automation** and enable the relevant browser under ADHD Guard.
 
