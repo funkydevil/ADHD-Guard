@@ -58,6 +58,47 @@ final class ConfigurationStore: ObservableObject {
         configuration = .defaults
     }
 
+    func containsFocusApplication(bundleIdentifier: String) -> Bool {
+        configuration.applicationRules.contains {
+            $0.bundleIdentifier.caseInsensitiveCompare(bundleIdentifier) == .orderedSame
+        }
+    }
+
+    func addFocusApplication(name: String, bundleIdentifier: String) {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedBundleIdentifier = bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty,
+              !trimmedBundleIdentifier.isEmpty,
+              !trimmedBundleIdentifier.hasPrefix("unknown.") else { return }
+
+        if let index = configuration.applicationRules.firstIndex(where: {
+            $0.bundleIdentifier.caseInsensitiveCompare(trimmedBundleIdentifier) == .orderedSame
+        }) {
+            configuration.applicationRules[index].name = trimmedName
+        } else {
+            configuration.applicationRules.append(
+                ApplicationRule(name: trimmedName, bundleIdentifier: trimmedBundleIdentifier)
+            )
+        }
+    }
+
+    func containsDistractingSite(_ host: String) -> Bool {
+        RuleEvaluator.matchingWebsiteRule(
+            host: host,
+            rules: configuration.websiteRules
+        ) != nil
+    }
+
+    func addDistractingSite(_ input: String) -> Bool {
+        guard let host = RuleEvaluator.normalizedHost(from: input) else { return false }
+        guard !configuration.websiteRules.contains(where: {
+            $0.host.caseInsensitiveCompare(host) == .orderedSame
+        }) else { return true }
+
+        configuration.websiteRules.append(WebsiteRule(host: host))
+        return true
+    }
+
     private func save() {
         guard let data = try? encoder.encode(configuration) else { return }
         defaults.set(data, forKey: storageKey)

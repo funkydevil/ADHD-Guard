@@ -446,6 +446,39 @@ final class ConfigurationStoreTests: XCTestCase {
         })
     }
 
+    func testQuickAddFocusApplicationDeduplicatesAndRefreshesName() throws {
+        let suiteName = "ADHDGuardTests.ConfigurationStore.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(true, forKey: "adhd-guard.migration.browser-rules.v1")
+        defaults.set(true, forKey: "adhd-guard.migration.default-website-rules.v1")
+        let store = ConfigurationStore(defaults: defaults)
+        store.configuration.applicationRules = []
+
+        store.addFocusApplication(name: "Notes", bundleIdentifier: "com.apple.Notes")
+        store.addFocusApplication(name: "Apple Notes", bundleIdentifier: "COM.APPLE.NOTES")
+
+        XCTAssertEqual(store.configuration.applicationRules.count, 1)
+        XCTAssertEqual(store.configuration.applicationRules.first?.name, "Apple Notes")
+        XCTAssertTrue(store.containsFocusApplication(bundleIdentifier: "com.apple.notes"))
+    }
+
+    func testQuickAddDistractingSiteNormalizesAndMatchesSubdomains() throws {
+        let suiteName = "ADHDGuardTests.ConfigurationStore.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(true, forKey: "adhd-guard.migration.browser-rules.v1")
+        defaults.set(true, forKey: "adhd-guard.migration.default-website-rules.v1")
+        let store = ConfigurationStore(defaults: defaults)
+        store.configuration.websiteRules = []
+
+        XCTAssertTrue(store.addDistractingSite("https://www.reddit.com/r/swift"))
+        XCTAssertTrue(store.addDistractingSite("reddit.com"))
+
+        XCTAssertEqual(store.configuration.websiteRules.map(\.host), ["reddit.com"])
+        XCTAssertTrue(store.containsDistractingSite("old.reddit.com"))
+    }
+
     func testDefaultWebsiteRulesAreMigratedOnceWithoutOverwritingLaterRemoval() throws {
         let suiteName = "ADHDGuardTests.ConfigurationStore.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

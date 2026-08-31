@@ -11,6 +11,7 @@ final class GuardMonitor: ObservableObject {
     @Published private(set) var lastDecision: RuleDecision?
     @Published private(set) var recentVisitedHosts: [String] = []
     @Published private(set) var recentApplications: [RecentApplication] = []
+    @Published private(set) var lastExternalContext: ActivityContext?
 
     private let store: ConfigurationStore
     private let alarm: AlarmController
@@ -52,15 +53,13 @@ final class GuardMonitor: ObservableObject {
 
     func checkNow() {
         let configuration = store.configuration
-        guard configuration.monitoringEnabled else {
-            resetDistraction()
-            alarm.dismiss()
-            statusText = "Monitoring is off"
-            return
-        }
 
+        // Keep the current context and session-only recents useful while
+        // reminders are paused. Enforcement still exits below.
         guard let application = NSWorkspace.shared.frontmostApplication else {
-            statusText = "Waiting for the active application"
+            statusText = configuration.monitoringEnabled
+                ? "Waiting for the active application"
+                : "Reminders are paused"
             return
         }
 
@@ -91,6 +90,17 @@ final class GuardMonitor: ObservableObject {
             ownBundleIdentifier: Bundle.main.bundleIdentifier ?? "com.funkydevil.ADHDGuard"
         )
         lastDecision = decision
+        if !isOwnApplication {
+            lastExternalContext = context
+        }
+
+        guard configuration.monitoringEnabled else {
+            resetDistraction()
+            alarm.dismiss()
+            statusText = "Reminders are paused"
+            return
+        }
+
         focusReturnHistory.record(
             decision: decision,
             context: context,

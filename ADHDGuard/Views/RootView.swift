@@ -1,82 +1,250 @@
 import SwiftUI
 
 enum GuardSection: String, CaseIterable, Identifiable {
-    case dashboard
-    case applications
-    case websites
-    case preferences
+    case status
+    case rules
+    case settings
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .dashboard: "Dashboard"
-        case .applications: "Applications"
-        case .websites: "Websites"
-        case .preferences: "Preferences"
+        case .status: "Status"
+        case .rules: "Lists"
+        case .settings: "Settings"
         }
     }
 
     var symbol: String {
         switch self {
-        case .dashboard: "shield.lefthalf.filled"
-        case .applications: "app.dashed"
-        case .websites: "globe"
-        case .preferences: "slider.horizontal.3"
+        case .status: "scope"
+        case .rules: "square.stack.3d.up"
+        case .settings: "slider.horizontal.3"
+        }
+    }
+}
+
+enum RuleCollection: String, CaseIterable, Identifiable {
+    case focusApps
+    case distractingSites
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .focusApps: "Focus apps"
+        case .distractingSites: "Distracting sites"
         }
     }
 }
 
 @MainActor
 final class GuardNavigation: ObservableObject {
-    @Published var selection: GuardSection? = .dashboard
+    @Published var selection: GuardSection = .status
+    @Published var ruleCollection: RuleCollection = .focusApps
+
+    func openRules(_ collection: RuleCollection) {
+        ruleCollection = collection
+        selection = .rules
+    }
 }
 
 struct RootView: View {
-    @EnvironmentObject private var store: ConfigurationStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var monitor: GuardMonitor
-    @EnvironmentObject private var alarm: AlarmController
     @EnvironmentObject private var navigation: GuardNavigation
 
     var body: some View {
-        NavigationSplitView {
-            List(GuardSection.allCases, selection: $navigation.selection) { section in
-                Label(section.title, systemImage: section.symbol)
-                    .tag(section)
-            }
-            .navigationTitle("ADHD Guard")
-            .navigationSplitViewColumnWidth(min: 180, ideal: 205)
-        } detail: {
-            Group {
-                switch navigation.selection ?? .dashboard {
-                case .dashboard:
-                    DashboardView()
-                case .applications:
-                    ApplicationRulesView()
-                case .websites:
-                    WebsiteRulesView()
-                case .preferences:
-                    PreferencesView()
+        ZStack {
+            GuardAuraBackground()
+
+            HStack(spacing: 0) {
+                GlassNavigationRail(selection: $navigation.selection)
+                    .frame(width: 176)
+
+                ZStack {
+                    detailView
+                        .id(navigation.selection)
+                        .transition(detailTransition)
                 }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Toggle(isOn: $store.configuration.monitoringEnabled) {
-                    Label("Guard", systemImage: store.configuration.monitoringEnabled ? "shield.fill" : "shield")
-                }
-                .toggleStyle(.switch)
-                .disabled(alarm.activeAlarm?.kind == .distraction)
-                .help(
-                    alarm.activeAlarm?.kind == .distraction
-                        ? "Return to a focused context before pausing"
-                        : (store.configuration.monitoringEnabled ? "Stop monitoring" : "Start monitoring")
-                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: navigation.selection)
             }
         }
         .tint(GuardPalette.accent)
         .frame(minWidth: 900, minHeight: 620)
         .onAppear { monitor.start() }
+    }
+
+    @ViewBuilder
+    private var detailView: some View {
+        switch navigation.selection {
+        case .status:
+            DashboardView()
+        case .rules:
+            RulesView()
+        case .settings:
+            PreferencesView()
+                .padding(.horizontal, 18)
+        }
+    }
+
+    private var detailTransition: AnyTransition {
+        reduceMotion
+            ? .opacity
+            : .asymmetric(
+                insertion: .move(edge: .trailing).combined(with: .opacity),
+                removal: .move(edge: .leading).combined(with: .opacity)
+            )
+    }
+}
+
+private struct GlassNavigationRail: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Binding var selection: GuardSection
+    @Namespace private var selectionNamespace
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            brand
+
+            VStack(spacing: 8) {
+                ForEach(GuardSection.allCases) { section in
+                    navigationButton(section)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(18)
+        .background {
+            if reduceTransparency {
+                Rectangle()
+                    .fill(Color(nsColor: .windowBackgroundColor))
+            } else {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .mask {
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black, location: 0),
+                            .init(color: .black.opacity(0.94), location: 0.78),
+                            .init(color: .clear, location: 1)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                }
+            }
+        }
+        .overlay(alignment: .trailing) {
+            Rectangle()
+                .fill(Color.primary.opacity(0.055))
+                .frame(width: 1)
+        }
+    }
+
+    private var brand: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "scope")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 34, height: 34)
+                .background(
+                    LinearGradient(
+                        colors: [GuardPalette.accent, GuardPalette.accent.opacity(0.68)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                )
+                .shadow(color: GuardPalette.accent.opacity(0.32), radius: 12, y: 5)
+
+            Text("ADHD\nGuard")
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .fixedSize()
+        }
+        .padding(.horizontal, 8)
+        .padding(.bottom, 2)
+    }
+
+    private func navigationButton(_ section: GuardSection) -> some View {
+        Button {
+            withAnimation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.82)) {
+                selection = section
+            }
+        } label: {
+            HStack(spacing: 11) {
+                Image(systemName: section.symbol)
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 20)
+                Text(section.title)
+                    .font(.subheadline.weight(.semibold))
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(selection == section ? Color.primary : Color.secondary)
+            .padding(.horizontal, 12)
+            .frame(height: 44)
+            .background {
+                if selection == section {
+                    Capsule()
+                        .fill(GuardPalette.accent.opacity(0.14))
+                        .overlay {
+                            Capsule().stroke(GuardPalette.accent.opacity(0.22), lineWidth: 1)
+                        }
+                        .matchedGeometryEffect(id: "rail-selection", in: selectionNamespace)
+                }
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selection == section ? .isSelected : [])
+    }
+}
+
+private struct RulesView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @EnvironmentObject private var navigation: GuardNavigation
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Your lists")
+                        .font(.system(size: 30, weight: .semibold, design: .rounded))
+                    Text("Choose where focus belongs — and what pulls you away.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Picker("List", selection: $navigation.ruleCollection) {
+                    ForEach(RuleCollection.allCases) { collection in
+                        Text(collection.title).tag(collection)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 300)
+            }
+
+            Group {
+                switch navigation.ruleCollection {
+                case .focusApps:
+                    ApplicationRulesView()
+                case .distractingSites:
+                    WebsiteRulesView()
+                }
+            }
+            .id(navigation.ruleCollection)
+            .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.985)))
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: navigation.ruleCollection)
+        }
+        .padding(30)
+        .frame(maxWidth: 900, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .top)
     }
 }

@@ -3,55 +3,56 @@ import SwiftUI
 struct DashboardView: View {
     @EnvironmentObject private var store: ConfigurationStore
     @EnvironmentObject private var monitor: GuardMonitor
-
-    private let columns = [
-        GridItem(.flexible(), spacing: 14),
-        GridItem(.flexible(), spacing: 14),
-        GridItem(.flexible(), spacing: 14)
-    ]
+    @EnvironmentObject private var navigation: GuardNavigation
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                header
-                focusSurface
-
-                LazyVGrid(columns: columns, spacing: 14) {
-                    MetricCard(
-                        title: "Application",
-                        value: monitor.currentContext?.applicationName ?? "No activity yet",
-                        detail: monitor.currentContext?.bundleIdentifier ?? "Waiting for the first check",
-                        symbol: "macwindow"
-                    )
-                    MetricCard(
-                        title: "Website",
-                        value: monitor.currentContext?.browserURL?.host ?? "Not in a browser",
-                        detail: monitor.currentContext?.browserURL?.absoluteString ?? "Active tab appears here",
-                        symbol: "globe"
-                    )
-                    MetricCard(
-                        title: "Focus buffer",
-                        value: timerValue,
-                        detail: "Up to \(store.configuration.distractionGraceSeconds)s outside focus",
-                        symbol: "timer"
-                    )
-                }
-
-                HStack(spacing: 10) {
-                    Image(systemName: "moon.zzz")
-                        .foregroundStyle(GuardPalette.accent)
-                    Text("Idle time")
-                        .font(.subheadline.weight(.semibold))
-                    Text(duration(monitor.currentContext?.idleSeconds ?? 0))
-                        .font(.subheadline.monospacedDigit())
-                    Spacer()
-                    Text(idleDetail)
-                        .font(.caption)
+            VStack(spacing: 24) {
+                VStack(spacing: 7) {
+                    Text("Your focus, at a glance")
+                        .font(.system(size: 30, weight: .semibold, design: .rounded))
+                    Text("One status. One current activity. Nothing else competing for attention.")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .guardCard(cornerRadius: 12)
+
+                StatusOrb(presentation: presentation)
+                    .padding(.vertical, 4)
+
+                if !store.configuration.monitoringEnabled {
+                    Button("Start Guard", action: startGuard)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                }
+
+                ActiveContextCard(
+                    context: displayContext,
+                    classification: contextClassification,
+                    classificationColor: classificationColor,
+                    actionTitle: contextActionTitle,
+                    action: performContextAction
+                )
+
+                HStack(spacing: 14) {
+                    RuleShortcutCard(
+                        title: "Focus apps",
+                        count: store.configuration.applicationRules.count,
+                        detail: "Apps that keep you in flow",
+                        symbol: "app.badge.checkmark",
+                        color: GuardPalette.focused,
+                        action: { navigation.openRules(.focusApps) }
+                    )
+
+                    RuleShortcutCard(
+                        title: "Distracting sites",
+                        count: store.configuration.websiteRules.count,
+                        detail: "Sites that start the timer",
+                        symbol: "globe.badge.chevron.backward",
+                        color: GuardPalette.alarm,
+                        action: { navigation.openRules(.distractingSites) }
+                    )
+                }
 
                 if let browserAccessMessage = monitor.browserAccessMessage {
                     NoticeView(
@@ -62,147 +63,192 @@ struct DashboardView: View {
                     )
                 }
             }
-            .frame(maxWidth: 800, alignment: .leading)
-            .padding(28)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: 760)
+            .padding(.horizontal, 30)
+            .padding(.vertical, 28)
+            .frame(maxWidth: .infinity)
         }
-        .navigationTitle("Dashboard")
     }
 
-    private var header: some View {
-        HStack(spacing: 14) {
-            Image(systemName: store.configuration.monitoringEnabled ? "scope" : "pause.fill")
-                .font(.system(size: 25, weight: .semibold))
-                .foregroundStyle(statusColor)
-                .frame(width: 54, height: 54)
-                .background(statusColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    private var displayContext: ActivityContext? {
+        guard let current = monitor.currentContext else {
+            return monitor.lastExternalContext
+        }
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(store.configuration.monitoringEnabled ? "Guard is active" : "Guard is paused")
-                    .font(.system(size: 25, weight: .semibold))
-                Text(monitor.statusText)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+        let ownIdentifier = Bundle.main.bundleIdentifier ?? "com.funkydevil.ADHDGuard"
+        if current.bundleIdentifier.caseInsensitiveCompare(ownIdentifier) == .orderedSame {
+            return monitor.lastExternalContext
+        }
+        return current
+    }
+
+    private var displayDecision: RuleDecision? {
+        guard let displayContext else { return nil }
+        return RuleEvaluator.evaluate(
+            context: displayContext,
+            configuration: store.configuration,
+            ownBundleIdentifier: Bundle.main.bundleIdentifier
+        )
+    }
+
+    private var presentation: GuardStatusPresentation {
+        GuardStatusPresentation(
+            monitoringEnabled: store.configuration.monitoringEnabled,
+            decision: displayDecision,
+            remaining: monitor.distractionRemaining,
+            graceSeconds: store.configuration.distractionGraceSeconds
+        )
+    }
+
+    private var contextClassification: String {
+        guard let context = displayContext else { return "Waiting for activity" }
+        if let host = context.browserURL?.host, store.containsDistractingSite(host) {
+            return "Distracting site"
+        }
+        if store.containsFocusApplication(bundleIdentifier: context.bundleIdentifier) {
+            return "Focus app"
+        }
+        return "Not in your lists"
+    }
+
+    private var classificationColor: Color {
+        switch contextClassification {
+        case "Distracting site": GuardPalette.alarm
+        case "Focus app": GuardPalette.focused
+        default: GuardPalette.accent
+        }
+    }
+
+    private var contextActionTitle: String? {
+        guard let context = displayContext else { return nil }
+        if let host = context.browserURL?.host {
+            return store.containsDistractingSite(host)
+                ? "Open distracting sites"
+                : "Mark site as distracting"
+        }
+        return store.containsFocusApplication(bundleIdentifier: context.bundleIdentifier)
+            ? "Open focus apps"
+            : "Add app to focus"
+    }
+
+    private func startGuard() {
+        store.configuration.monitoringEnabled = true
+    }
+
+    private func performContextAction() {
+        guard let context = displayContext else { return }
+        if let host = context.browserURL?.host {
+            if store.containsDistractingSite(host) {
+                navigation.openRules(.distractingSites)
+            } else {
+                _ = store.addDistractingSite(host)
             }
-
-            Spacer()
-            StatusBadge(title: statusLabel, color: statusColor)
+            return
         }
-    }
 
-    private var focusSurface: some View {
-        HStack(spacing: 18) {
-            VStack(alignment: .leading, spacing: 7) {
-                Text("CURRENT FOCUS STATE")
-                    .font(.caption2.weight(.bold))
-                    .tracking(0.8)
-                    .foregroundStyle(.secondary)
-                Text(focusHeadline)
-                    .font(.system(size: 20, weight: .semibold))
-                Text(focusDetail)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-
-            Spacer()
-
-            Image(systemName: focusSymbol)
-                .font(.system(size: 30, weight: .medium))
-                .foregroundStyle(statusColor)
-                .frame(width: 58, height: 58)
-                .background(statusColor.opacity(0.1), in: Circle())
+        if store.containsFocusApplication(bundleIdentifier: context.bundleIdentifier) {
+            navigation.openRules(.focusApps)
+        } else {
+            store.addFocusApplication(
+                name: context.applicationName,
+                bundleIdentifier: context.bundleIdentifier
+            )
         }
-        .padding(20)
-        .guardCard(cornerRadius: 14)
-    }
-
-    private var statusColor: Color {
-        guard store.configuration.monitoringEnabled else { return .secondary }
-        guard let decision = monitor.lastDecision else { return GuardPalette.accent }
-        switch decision {
-        case .focused: return GuardPalette.focused
-        case .distracted: return monitor.distractionRemaining == 0 ? GuardPalette.alarm : GuardPalette.warning
-        }
-    }
-
-    private var statusLabel: String {
-        guard store.configuration.monitoringEnabled else { return "Paused" }
-        guard let decision = monitor.lastDecision else { return "Starting" }
-        switch decision {
-        case .focused: return "Focused"
-        case .distracted: return monitor.distractionRemaining == 0 ? "Refocus now" : "Outside focus"
-        }
-    }
-
-    private var focusHeadline: String {
-        guard store.configuration.monitoringEnabled else { return "Monitoring is paused" }
-        switch monitor.lastDecision {
-        case .focused: return "You’re in a focused context"
-        case .distracted: return monitor.distractionRemaining == 0 ? "The focus reminder is active" : "Your focus buffer is running"
-        case nil: return "Waiting for activity"
-        }
-    }
-
-    private var focusDetail: String {
-        if let host = monitor.currentContext?.browserURL?.host {
-            return "\(monitor.currentContext?.applicationName ?? "Browser") · \(host)"
-        }
-        return monitor.currentContext?.applicationName ?? "Open an app to begin monitoring."
-    }
-
-    private var focusSymbol: String {
-        switch monitor.lastDecision {
-        case .focused: "checkmark.circle.fill"
-        case .distracted: monitor.distractionRemaining == 0 ? "exclamationmark.circle.fill" : "hourglass.circle.fill"
-        case nil: "scope"
-        }
-    }
-
-    private var timerValue: String {
-        if let remaining = monitor.distractionRemaining {
-            return remaining == 0 ? "Alerting" : "\(remaining)s left"
-        }
-        return "Ready"
-    }
-
-    private var idleDetail: String {
-        store.configuration.idleMonitoringEnabled
-            ? "Warn after \(duration(TimeInterval(store.configuration.idleThresholdSeconds)))"
-            : "Idle reminders are off"
-    }
-
-    private func duration(_ seconds: TimeInterval) -> String {
-        let total = max(0, Int(seconds))
-        if total < 60 { return "\(total)s" }
-        return "\(total / 60)m \(total % 60)s"
     }
 }
 
-private struct MetricCard: View {
-    let title: String
-    let value: String
-    let detail: String
-    let symbol: String
+private struct ActiveContextCard: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let context: ActivityContext?
+    let classification: String
+    let classificationColor: Color
+    let actionTitle: String?
+    let action: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(title, systemImage: symbol)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(size: 17, weight: .semibold))
-                .lineLimit(1)
-            Text(detail)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        HStack(spacing: 18) {
+            if let context {
+                ApplicationIcon(bundleIdentifier: context.bundleIdentifier, size: 50)
+            } else {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 23, weight: .medium))
+                    .foregroundStyle(GuardPalette.accent)
+                    .frame(width: 50, height: 50)
+                    .background(GuardPalette.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Current activity")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(context?.applicationName ?? "Waiting for activity")
+                    .font(.system(size: 19, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                if let host = context?.browserURL?.host {
+                    Text(host)
+                        .font(.subheadline.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                StatusBadge(title: classification, color: classificationColor)
+                    .padding(.top, 3)
+            }
+
+            Spacer(minLength: 12)
+
+            if let actionTitle {
+                Button(actionTitle, action: action)
+                    .buttonStyle(.borderedProminent)
+                    .tint(classificationColor)
+            }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 116, alignment: .topLeading)
-        .guardCard(cornerRadius: 14)
+        .padding(20)
+        .frame(maxWidth: .infinity, minHeight: 126, alignment: .leading)
+        .guardCard(cornerRadius: 22)
+        .animation(
+            reduceMotion ? nil : .easeInOut(duration: 0.18),
+            value: (context?.bundleIdentifier ?? "") + "|" + (context?.browserURL?.host ?? "")
+        )
+    }
+}
+
+private struct RuleShortcutCard: View {
+    let title: String
+    let count: Int
+    let detail: String
+    let symbol: String
+    let color: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                Image(systemName: symbol)
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(color)
+                    .frame(width: 42, height: 42)
+                    .background(color.opacity(0.11), in: Circle())
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("\(title) · \(count)")
+                        .font(.headline)
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(16)
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+        .guardCard(cornerRadius: 18)
     }
 }
 
@@ -224,6 +270,6 @@ struct NoticeView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(color.opacity(0.09), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(color.opacity(0.09), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
