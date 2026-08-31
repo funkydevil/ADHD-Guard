@@ -35,6 +35,10 @@ struct WebsiteRule: Codable, Identifiable, Equatable {
 }
 
 struct GuardConfiguration: Codable, Equatable {
+    static let defaultWebsiteRules: [WebsiteRule] = [
+        WebsiteRule(host: "youtube.com", policy: .blocked)
+    ]
+
     static let browserApplicationRules: [ApplicationRule] = [
         ApplicationRule(name: "Safari", bundleIdentifier: "com.apple.Safari", policy: .allowed),
         ApplicationRule(name: "Google Chrome", bundleIdentifier: "com.google.Chrome", policy: .allowed),
@@ -56,7 +60,7 @@ struct GuardConfiguration: Codable, Equatable {
         ApplicationRule(name: "Visual Studio Code", bundleIdentifier: "com.microsoft.VSCode", policy: .allowed),
         ApplicationRule(name: "Codex", bundleIdentifier: "com.openai.codex", policy: .allowed)
     ] + browserApplicationRules
-    var websiteRules: [WebsiteRule] = []
+    var websiteRules: [WebsiteRule] = defaultWebsiteRules
 
     static let defaults = GuardConfiguration()
 }

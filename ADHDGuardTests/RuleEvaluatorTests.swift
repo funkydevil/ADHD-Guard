@@ -477,6 +477,35 @@ private enum LaunchAtLoginTestError: LocalizedError {
 
 @MainActor
 final class ConfigurationStoreTests: XCTestCase {
+    func testYouTubeIsBlockedByDefault() {
+        XCTAssertTrue(GuardConfiguration.defaults.websiteRules.contains {
+            $0.host == "youtube.com" && $0.policy == .blocked
+        })
+    }
+
+    func testDefaultWebsiteRulesAreMigratedOnceWithoutOverwritingLaterRemoval() throws {
+        let suiteName = "ADHDGuardTests.ConfigurationStore.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        var legacyConfiguration = GuardConfiguration.defaults
+        legacyConfiguration.websiteRules = [WebsiteRule(host: "youtube.com", policy: .allowed)]
+        defaults.set(
+            try JSONEncoder().encode(legacyConfiguration),
+            forKey: "adhd-guard.configuration.v1"
+        )
+
+        let migratedStore = ConfigurationStore(defaults: defaults)
+        XCTAssertTrue(migratedStore.configuration.websiteRules.contains {
+            $0.host == "youtube.com" && $0.policy == .blocked
+        })
+
+        migratedStore.configuration.websiteRules.removeAll { $0.host == "youtube.com" }
+        let reloadedStore = ConfigurationStore(defaults: defaults)
+
+        XCTAssertFalse(reloadedStore.configuration.websiteRules.contains { $0.host == "youtube.com" })
+    }
+
     func testBrowserRulesAreMigratedOnceWithoutOverwritingLaterRemoval() throws {
         let suiteName = "ADHDGuardTests.ConfigurationStore.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
