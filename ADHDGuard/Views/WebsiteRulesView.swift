@@ -48,29 +48,11 @@ struct WebsiteRulesView: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
 
-            Divider()
-
-            HStack(spacing: 12) {
-                Image(systemName: "plus.square.dashed")
-                    .font(.title3)
-                    .foregroundStyle(GuardPalette.accent)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Add manually")
-                        .font(.subheadline.weight(.semibold))
-                    TextField("Enter a website, for example youtube.com", text: $newSite)
-                        .textFieldStyle(.roundedBorder)
-                        .onSubmit(addSite)
-                }
-                Button("Add site", action: addSite)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(newSite.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-
-            if let validationMessage {
-                Label(validationMessage, systemImage: "exclamationmark.circle")
-                    .font(.caption)
-                    .foregroundStyle(GuardPalette.alarm)
-            }
+            ManualSiteAddCard(
+                newSite: $newSite,
+                validationMessage: validationMessage,
+                addAction: addSite
+            )
         }
         .padding(18)
         .guardCard(cornerRadius: 20)
@@ -154,6 +136,76 @@ struct WebsiteRulesView: View {
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
             store.configuration.websiteRules.removeAll { $0.id == id }
         }
+    }
+}
+
+private struct ManualSiteAddCard: View {
+    @Binding var newSite: String
+    let validationMessage: String?
+    let addAction: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(spacing: 11) {
+                Image(systemName: "plus.square.dashed")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(GuardPalette.alarm)
+                    .frame(width: 36, height: 36)
+                    .background(GuardPalette.alarm.opacity(0.1), in: RoundedRectangle(cornerRadius: 11))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Add manually")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Enter a domain or paste a URL.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    siteField
+                    addButton
+                }
+
+                VStack(spacing: 10) {
+                    siteField
+                    addButton
+                        .frame(maxWidth: .infinity)
+                }
+            }
+
+            if let validationMessage {
+                Label(validationMessage, systemImage: "exclamationmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(GuardPalette.alarm)
+            }
+        }
+        .padding(14)
+        .background(
+            GuardPalette.alarm.opacity(0.055),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(GuardPalette.alarm.opacity(0.14), lineWidth: 1)
+        }
+    }
+
+    private var siteField: some View {
+        TextField("youtube.com", text: $newSite)
+            .textFieldStyle(.roundedBorder)
+            .controlSize(.large)
+            .onSubmit(addAction)
+    }
+
+    private var addButton: some View {
+        Button("Add site", action: addAction)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(GuardPalette.alarm)
+            .frame(minWidth: 102)
+            .disabled(newSite.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 }
 

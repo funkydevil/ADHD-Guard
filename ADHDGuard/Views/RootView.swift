@@ -86,7 +86,6 @@ struct RootView: View {
             RulesView()
         case .settings:
             PreferencesView()
-                .padding(.horizontal, 18)
         }
     }
 

@@ -60,7 +60,7 @@ struct ADHDGuardApp: App {
                 .environmentObject(alarm)
                 .environmentObject(navigation)
         } label: {
-            Label("ADHD Guard", systemImage: store.configuration.monitoringEnabled ? "shield.fill" : "shield")
+            MenuBarStatusIcon(presentation: menuBarPresentation)
         }
         .menuBarExtraStyle(.window)
 
@@ -68,8 +68,33 @@ struct ADHDGuardApp: App {
             PreferencesView()
                 .environmentObject(store)
                 .environmentObject(alarm)
+                .environmentObject(monitor)
                 .environmentObject(launchAtLogin)
                 .frame(width: 560, height: 540)
         }
+    }
+
+    private var menuBarPresentation: GuardStatusPresentation {
+        GuardStatusPresentation(
+            monitoringEnabled: store.configuration.monitoringEnabled,
+            decision: menuBarDecision,
+            remaining: monitor.distractionRemaining,
+            graceSeconds: store.configuration.distractionGraceSeconds
+        )
+    }
+
+    private var menuBarDecision: RuleDecision? {
+        let ownIdentifier = Bundle.main.bundleIdentifier ?? "com.funkydevil.ADHDGuard"
+        let currentContext = monitor.currentContext
+        let context = currentContext?.bundleIdentifier.caseInsensitiveCompare(ownIdentifier) == .orderedSame
+            ? monitor.lastExternalContext
+            : currentContext
+
+        guard let context else { return nil }
+        return RuleEvaluator.evaluate(
+            context: context,
+            configuration: store.configuration,
+            ownBundleIdentifier: Bundle.main.bundleIdentifier
+        )
     }
 }

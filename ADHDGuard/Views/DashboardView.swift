@@ -9,15 +9,15 @@ struct DashboardView: View {
         ScrollView {
             VStack(spacing: 24) {
                 VStack(spacing: 7) {
-                    Text("Your focus, at a glance")
+                    Text("Your focus. Safeguarded.")
                         .font(.system(size: 30, weight: .semibold, design: .rounded))
-                    Text("One status. One current activity. Nothing else competing for attention.")
+                    Text("See what has your attention — and shape your focus zone in one click.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
 
-                StatusOrb(presentation: presentation)
+                FocusStatusObject(presentation: presentation)
                     .padding(.vertical, 4)
 
                 if !store.configuration.monitoringEnabled {
@@ -31,6 +31,7 @@ struct DashboardView: View {
                     classification: contextClassification,
                     classificationColor: classificationColor,
                     actionTitle: contextActionTitle,
+                    actionColor: contextActionColor,
                     action: performContextAction
                 )
 
@@ -131,6 +132,11 @@ struct DashboardView: View {
             : "Add app to focus"
     }
 
+    private var contextActionColor: Color {
+        guard let context = displayContext else { return GuardPalette.accent }
+        return context.browserURL?.host == nil ? GuardPalette.focused : GuardPalette.alarm
+    }
+
     private func startGuard() {
         store.configuration.monitoringEnabled = true
     }
@@ -164,6 +170,7 @@ private struct ActiveContextCard: View {
     let classification: String
     let classificationColor: Color
     let actionTitle: String?
+    let actionColor: Color
     let action: () -> Void
 
     var body: some View {
@@ -198,9 +205,16 @@ private struct ActiveContextCard: View {
             Spacer(minLength: 12)
 
             if let actionTitle {
-                Button(actionTitle, action: action)
+                Button(action: action) {
+                    Label(
+                        actionTitle,
+                        systemImage: context?.browserURL?.host == nil
+                            ? "plus.app"
+                            : "exclamationmark.shield"
+                    )
+                }
                     .buttonStyle(.borderedProminent)
-                    .tint(classificationColor)
+                    .tint(actionColor)
             }
         }
         .padding(20)

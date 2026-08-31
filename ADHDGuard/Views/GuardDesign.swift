@@ -26,6 +26,53 @@ struct GuardStatusPresentation: Equatable {
     let color: Color
     let progress: Double
 
+    var gradientColors: [Color] {
+        switch state {
+        case .paused:
+            [
+                Color(red: 0.47, green: 0.49, blue: 0.57),
+                Color(red: 0.30, green: 0.32, blue: 0.40),
+                Color(red: 0.46, green: 0.42, blue: 0.53)
+            ]
+        case .starting:
+            [
+                Color(red: 0.47, green: 0.41, blue: 1.00),
+                Color(red: 0.32, green: 0.49, blue: 1.00),
+                Color(red: 0.61, green: 0.39, blue: 1.00)
+            ]
+        case .focused:
+            [
+                Color(red: 0.13, green: 0.79, blue: 0.54),
+                Color(red: 0.21, green: 0.78, blue: 0.74),
+                Color(red: 0.40, green: 0.47, blue: 1.00)
+            ]
+        case .grace:
+            [
+                Color(red: 1.00, green: 0.76, blue: 0.29),
+                Color(red: 0.96, green: 0.54, blue: 0.24),
+                Color(red: 0.94, green: 0.36, blue: 0.44)
+            ]
+        case .alarm:
+            [
+                Color(red: 1.00, green: 0.38, blue: 0.45),
+                Color(red: 0.85, green: 0.20, blue: 0.35),
+                Color(red: 0.49, green: 0.25, blue: 0.89)
+            ]
+        }
+    }
+
+    var shortValue: String? {
+        guard case let .grace(remaining) = state else { return nil }
+        return "\(remaining)s"
+    }
+
+    var accessibilityTitle: String {
+        if let shortValue {
+            return "\(shortValue) outside focus"
+        }
+        return title
+    }
+
     init(
         monitoringEnabled: Bool,
         decision: RuleDecision?,
@@ -114,71 +161,186 @@ struct GuardAuraBackground: View {
     }
 }
 
-struct StatusOrb: View {
+struct FocusLensShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX + rect.width * 0.09, y: rect.minY + rect.height * 0.09))
+        path.addCurve(
+            to: CGPoint(x: rect.maxX - rect.width * 0.05, y: rect.minY + rect.height * 0.22),
+            control1: CGPoint(x: rect.minX + rect.width * 0.31, y: rect.minY - rect.height * 0.03),
+            control2: CGPoint(x: rect.maxX - rect.width * 0.18, y: rect.minY + rect.height * 0.02)
+        )
+        path.addCurve(
+            to: CGPoint(x: rect.maxX - rect.width * 0.10, y: rect.maxY - rect.height * 0.10),
+            control1: CGPoint(x: rect.maxX + rect.width * 0.02, y: rect.minY + rect.height * 0.45),
+            control2: CGPoint(x: rect.maxX, y: rect.maxY - rect.height * 0.24)
+        )
+        path.addCurve(
+            to: CGPoint(x: rect.minX + rect.width * 0.07, y: rect.maxY - rect.height * 0.18),
+            control1: CGPoint(x: rect.maxX - rect.width * 0.30, y: rect.maxY + rect.height * 0.03),
+            control2: CGPoint(x: rect.minX + rect.width * 0.18, y: rect.maxY + rect.height * 0.01)
+        )
+        path.addCurve(
+            to: CGPoint(x: rect.minX + rect.width * 0.09, y: rect.minY + rect.height * 0.09),
+            control1: CGPoint(x: rect.minX - rect.width * 0.01, y: rect.maxY - rect.height * 0.38),
+            control2: CGPoint(x: rect.minX + rect.width * 0.01, y: rect.minY + rect.height * 0.23)
+        )
+        path.closeSubpath()
+        return path
+    }
+}
+
+struct FocusStatusObject: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @State private var shiftsGradient = false
 
     let presentation: GuardStatusPresentation
-    var size: CGFloat = 172
-    var showsDetail = true
 
     var body: some View {
-        VStack(spacing: showsDetail ? 16 : 8) {
-            ZStack {
-                Circle()
-                    .fill(presentation.color.opacity(0.13))
-                    .blur(radius: size * 0.11)
-                    .padding(size * 0.04)
+        ZStack {
+            FocusLensShape()
+                .fill(presentation.color.opacity(reduceTransparency ? 0.13 : 0.22))
+                .blur(radius: reduceTransparency ? 0 : 22)
+                .padding(8)
 
-                Circle()
-                    .fill(
-                        reduceTransparency
-                            ? AnyShapeStyle(Color(nsColor: .controlBackgroundColor))
-                            : AnyShapeStyle(.regularMaterial)
+            FocusLensShape()
+                .fill(
+                    LinearGradient(
+                        colors: presentation.gradientColors,
+                        startPoint: shiftsGradient ? .topTrailing : .topLeading,
+                        endPoint: shiftsGradient ? .bottomLeading : .bottomTrailing
                     )
+                )
 
-                Circle()
-                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-
-                Circle()
-                    .trim(from: 0, to: presentation.progress)
-                    .stroke(
-                        AngularGradient(
-                            colors: [presentation.color.opacity(0.28), presentation.color, presentation.color.opacity(0.72)],
-                            center: .center
-                        ),
-                        style: StrokeStyle(lineWidth: max(5, size * 0.045), lineCap: .round)
+            FocusLensShape()
+                .fill(
+                    RadialGradient(
+                        colors: [.white.opacity(0.34), .clear],
+                        center: shiftsGradient ? .topTrailing : .topLeading,
+                        startRadius: 0,
+                        endRadius: 250
                     )
-                    .rotationEffect(.degrees(-90))
-                    .padding(size * 0.055)
+                )
+                .opacity(reduceTransparency ? 0.28 : 0.72)
 
-                VStack(spacing: size * 0.04) {
-                    Image(systemName: presentation.symbol)
-                        .font(.system(size: size * 0.20, weight: .semibold, design: .rounded))
+            FocusLensShape()
+                .stroke(.white.opacity(0.2), lineWidth: 1)
+
+            HStack(spacing: 18) {
+                Image(systemName: presentation.symbol)
+                    .font(.system(size: 27, weight: .semibold, design: .rounded))
+                    .frame(width: 52, height: 52)
+                    .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 5) {
                     Text(presentation.title)
-                        .font(.system(size: size * 0.105, weight: .semibold, design: .rounded))
-                        .multilineTextAlignment(.center)
+                        .font(.system(size: 23, weight: .semibold, design: .rounded))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                    Text(presentation.detail)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.78))
                         .lineLimit(2)
-                        .minimumScaleFactor(0.72)
                 }
-                .foregroundStyle(presentation.color)
-                .padding(size * 0.16)
-                .id(presentation.title)
-                .transition(.opacity.combined(with: .scale(scale: 0.96)))
-            }
-            .frame(width: size, height: size)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: presentation)
 
-            if showsDetail {
-                Text(presentation.detail)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+
+                if let shortValue = presentation.shortValue {
+                    Text(shortValue)
+                        .font(.system(size: 29, weight: .bold, design: .rounded).monospacedDigit())
+                        .transition(.opacity)
+                }
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 34)
+            .padding(.vertical, 26)
+
+            if case .grace = presentation.state {
+                GeometryReader { proxy in
+                    Capsule()
+                        .fill(.white.opacity(0.75))
+                        .frame(width: max(22, (proxy.size.width - 68) * presentation.progress), height: 3)
+                        .position(x: 34 + max(22, (proxy.size.width - 68) * presentation.progress) / 2, y: proxy.size.height - 22)
+                }
             }
         }
+        .frame(maxWidth: 500)
+        .frame(height: 156)
+        .shadow(color: presentation.color.opacity(0.24), radius: 24, y: 12)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 8).repeatForever(autoreverses: true), value: shiftsGradient)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: presentation)
+        .onAppear { shiftsGradient = !reduceMotion }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Guard status: \(presentation.title). \(presentation.detail)")
+        .accessibilityLabel("Guard status: \(presentation.accessibilityTitle). \(presentation.detail)")
+    }
+}
+
+struct CompactGuardStatus: View {
+    let presentation: GuardStatusPresentation
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: presentation.gradientColors,
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 5, height: 42)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(presentation.title)
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                Text(presentation.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 6)
+
+            Group {
+                if let shortValue = presentation.shortValue {
+                    Text(shortValue)
+                        .font(.system(size: 16, weight: .bold, design: .rounded).monospacedDigit())
+                } else {
+                    Image(systemName: presentation.symbol)
+                        .font(.system(size: 15, weight: .semibold))
+                }
+            }
+            .foregroundStyle(presentation.color)
+            .frame(minWidth: 28)
+        }
+        .padding(.horizontal, 13)
+        .frame(minHeight: 60)
+        .guardCard(cornerRadius: 16)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Guard status: \(presentation.accessibilityTitle). \(presentation.detail)")
+    }
+}
+
+struct MenuBarStatusIcon: View {
+    let presentation: GuardStatusPresentation
+
+    var body: some View {
+        ZStack {
+            Image(systemName: presentation.state == .alarm ? "exclamationmark.shield.fill" : "shield.fill")
+                .font(.system(size: 15, weight: .medium))
+            Circle()
+                .fill(presentation.color)
+                .frame(width: 5, height: 5)
+                .overlay {
+                    Circle()
+                        .stroke(Color(nsColor: .windowBackgroundColor).opacity(0.8), lineWidth: 0.5)
+                }
+                .offset(y: 2)
+        }
+        .frame(width: 18, height: 18)
+        .accessibilityLabel("ADHD Guard, \(presentation.accessibilityTitle)")
     }
 }
 
