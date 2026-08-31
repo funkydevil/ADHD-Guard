@@ -218,13 +218,37 @@ final class GuardMonitor: ObservableObject {
             }
         }
 
-        if let runningApplication {
-            runningApplication.activate(options: [.activateAllWindows])
-        } else if let applicationURL {
-            let configuration = NSWorkspace.OpenConfiguration()
-            configuration.activates = true
-            workspace.openApplication(at: applicationURL, configuration: configuration)
+        if let runningApplication,
+           activate(runningApplication) {
+            return
         }
+
+        if let applicationURL {
+            openApplication(at: applicationURL, using: workspace)
+        }
+    }
+
+    private func activate(_ application: NSRunningApplication) -> Bool {
+        application.unhide()
+
+        if #available(macOS 14.0, *) {
+            NSApp.activate(ignoringOtherApps: true)
+            NSApp.yieldActivation(to: application)
+            return application.activate(
+                from: NSRunningApplication.current,
+                options: [.activateAllWindows]
+            )
+        }
+
+        return application.activate(
+            options: [.activateAllWindows, .activateIgnoringOtherApps]
+        )
+    }
+
+    private func openApplication(at applicationURL: URL, using workspace: NSWorkspace) {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        workspace.openApplication(at: applicationURL, configuration: configuration)
     }
 
     private func recordRecentHostIfNeeded(context: ActivityContext) {
