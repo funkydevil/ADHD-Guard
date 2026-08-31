@@ -234,6 +234,40 @@ final class GuardSessionStateTests: XCTestCase {
         XCTAssertNil(episode.startedAt)
     }
 
+    func testResetAfterAlarmReturnStartsANewFullBuffer() {
+        var episode = DistractionEpisode()
+        let start = Date(timeIntervalSince1970: 100)
+
+        XCTAssertEqual(
+            episode.remaining(
+                for: .distracted(detail: "Unlisted app", immediate: false),
+                now: start,
+                graceSeconds: 20
+            ),
+            20
+        )
+        XCTAssertEqual(
+            episode.remaining(
+                for: .distracted(detail: "Unlisted app", immediate: false),
+                now: start.addingTimeInterval(20),
+                graceSeconds: 20
+            ),
+            0
+        )
+
+        episode.reset()
+
+        XCTAssertEqual(
+            episode.remaining(
+                for: .distracted(detail: "Another unlisted app", immediate: false),
+                now: start.addingTimeInterval(21),
+                graceSeconds: 20
+            ),
+            20
+        )
+        XCTAssertFalse(episode.isAlarmLatched)
+    }
+
     func testImmediateBlockLatchesAnExistingGraceEpisode() {
         var episode = DistractionEpisode()
         let start = Date(timeIntervalSince1970: 100)

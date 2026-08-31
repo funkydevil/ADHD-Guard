@@ -190,6 +190,12 @@ final class GuardMonitor: ObservableObject {
     private func returnToLastFocusedContext() {
         guard let target = focusReturnHistory.target else { return }
 
+        // Do not wait for the polling loop to observe the restored app. Without
+        // this reset, a quick subsequent switch can inherit the previous alarm's
+        // latched state and skip the configured focus buffer.
+        resetDistraction()
+        alarm.dismiss()
+
         let workspace = NSWorkspace.shared
         let runningApplication = NSRunningApplication(processIdentifier: target.processIdentifier)
             .flatMap { application in
