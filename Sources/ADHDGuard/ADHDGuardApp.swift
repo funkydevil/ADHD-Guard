@@ -7,6 +7,7 @@ struct ADHDGuardApp: App {
     @StateObject private var alarm: AlarmController
     @StateObject private var monitor: GuardMonitor
     @StateObject private var navigation: GuardNavigation
+    @StateObject private var launchAtLogin: LaunchAtLoginController
 
     init() {
         let store = ConfigurationStore()
@@ -15,6 +16,7 @@ struct ADHDGuardApp: App {
         _alarm = StateObject(wrappedValue: alarm)
         _monitor = StateObject(wrappedValue: GuardMonitor(store: store, alarm: alarm))
         _navigation = StateObject(wrappedValue: GuardNavigation())
+        _launchAtLogin = StateObject(wrappedValue: LaunchAtLoginController())
     }
 
     var body: some Scene {
@@ -24,6 +26,7 @@ struct ADHDGuardApp: App {
                 .environmentObject(alarm)
                 .environmentObject(monitor)
                 .environmentObject(navigation)
+                .environmentObject(launchAtLogin)
                 .onAppear { monitor.start() }
         }
         .defaultSize(width: 980, height: 680)
@@ -65,6 +68,7 @@ struct ADHDGuardApp: App {
             PreferencesView()
                 .environmentObject(store)
                 .environmentObject(alarm)
+                .environmentObject(launchAtLogin)
                 .frame(width: 560, height: 540)
         }
     }

@@ -3,9 +3,38 @@ import SwiftUI
 struct PreferencesView: View {
     @EnvironmentObject private var store: ConfigurationStore
     @EnvironmentObject private var alarm: AlarmController
+    @EnvironmentObject private var launchAtLogin: LaunchAtLoginController
 
     var body: some View {
         Form {
+            Section("General") {
+                Toggle(
+                    "Start ADHD Guard at login",
+                    isOn: Binding(
+                        get: { launchAtLogin.isEnabled },
+                        set: { launchAtLogin.setEnabled($0) }
+                    )
+                )
+                .disabled(!launchAtLogin.isAvailable)
+
+                if launchAtLogin.requiresApproval {
+                    LabeledContent {
+                        Button("Open Login Items") {
+                            launchAtLogin.openLoginItemsSettings()
+                        }
+                    } label: {
+                        Label("Approval is required in System Settings", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(GuardPalette.warning)
+                    }
+                }
+
+                if let errorMessage = launchAtLogin.errorMessage {
+                    Label(errorMessage, systemImage: "xmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(GuardPalette.alarm)
+                }
+            }
+
             Section("Distraction timer") {
                 Stepper(
                     "Allow up to \(store.configuration.distractionGraceSeconds) seconds outside focus",
