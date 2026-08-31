@@ -29,22 +29,35 @@ struct PreferencesView: View {
                 .disabled(!store.configuration.idleMonitoringEnabled)
             }
 
-            Section("Alarm") {
-                Toggle("Speak warning phrases", isOn: $store.configuration.speaksWarnings)
-                Toggle("Play siren sound", isOn: $store.configuration.playsSound)
-                TextField("Distraction phrase", text: $store.configuration.focusPhrase)
-                TextField("Idle phrase", text: $store.configuration.idlePhrase)
+            Section("Reminder sound") {
+                Toggle("Play a reminder chime", isOn: $store.configuration.playsSound)
+                Toggle("Speak a focus phrase", isOn: $store.configuration.speaksWarnings)
 
-                Button("Test alarm") {
-                    alarm.present(
-                        kind: .test,
-                        title: "ADHD Guard test",
-                        message: "This is how a focus warning will look.",
+                LabeledContent("Focus phrase") {
+                    TextField("Focus phrase", text: $store.configuration.focusPhrase)
+                        .labelsHidden()
+                        .frame(maxWidth: 320)
+                }
+                .disabled(!store.configuration.speaksWarnings)
+
+                LabeledContent("Idle phrase") {
+                    TextField("Idle phrase", text: $store.configuration.idlePhrase)
+                        .labelsHidden()
+                        .frame(maxWidth: 320)
+                }
+                .disabled(!store.configuration.speaksWarnings)
+
+                Button("Preview reminder") {
+                    alarm.preview(
                         phrase: store.configuration.focusPhrase,
                         speaks: store.configuration.speaksWarnings,
                         playsSound: store.configuration.playsSound
                     )
                 }
+
+                Text("The chime repeats every 15 seconds. Voice repeats every 30 seconds until you return to an allowed context.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Browser permission") {

@@ -7,45 +7,72 @@ struct ApplicationRulesView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Image(systemName: "app.badge.checkmark")
+                    .font(.title2)
+                    .foregroundStyle(GuardPalette.accent)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Choose where focus belongs")
+                        .font(.headline)
+                    Text("Blocked apps alert immediately. Unlisted apps use the focus buffer.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(18)
+
+            Divider()
+
             List {
                 Section {
-                    ForEach($store.configuration.applicationRules) { $rule in
-                        HStack(spacing: 12) {
-                            Image(systemName: rule.policy.symbol)
-                                .foregroundStyle(rule.policy == .allowed ? .green : .red)
-                                .frame(width: 24)
+                    if store.configuration.applicationRules.isEmpty {
+                        EmptyRulesView(
+                            title: "No application rules",
+                            systemImage: "app.badge.checkmark",
+                            description: "Add the apps that belong to your focus session."
+                        )
+                        .frame(maxWidth: .infinity)
+                        .listRowBackground(Color.clear)
+                    } else {
+                        ForEach($store.configuration.applicationRules) { $rule in
+                            HStack(spacing: 12) {
+                                Image(systemName: rule.policy.symbol)
+                                    .foregroundStyle(rule.policy == .allowed ? GuardPalette.focused : GuardPalette.alarm)
+                                    .frame(width: 24)
 
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(rule.name).font(.headline)
-                                Text(rule.bundleIdentifier)
-                                    .font(.caption.monospaced())
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            Picker("Policy", selection: $rule.policy) {
-                                ForEach(RulePolicy.allCases) { policy in
-                                    Text(policy.title).tag(policy)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(rule.name).font(.headline)
+                                    Text(rule.bundleIdentifier)
+                                        .font(.caption.monospaced())
+                                        .foregroundStyle(.secondary)
                                 }
-                            }
-                            .labelsHidden()
-                            .frame(width: 110)
 
-                            Button(role: .destructive) {
-                                remove(rule.id)
-                            } label: {
-                                Image(systemName: "trash")
+                                Spacer()
+
+                                Picker("Policy", selection: $rule.policy) {
+                                    ForEach(RulePolicy.allCases) { policy in
+                                        Text(policy.title).tag(policy)
+                                    }
+                                }
+                                .labelsHidden()
+                                .frame(width: 110)
+
+                                Button(role: .destructive) {
+                                    remove(rule.id)
+                                } label: {
+                                    Image(systemName: "trash")
+                                }
+                                .buttonStyle(.borderless)
+                                .help("Remove rule")
                             }
-                            .buttonStyle(.borderless)
-                            .help("Remove rule")
+                            .padding(.vertical, 5)
                         }
-                        .padding(.vertical, 5)
                     }
                 } header: {
                     Text("Application rules")
                 } footer: {
-                    Text("Blocked applications trigger immediately. Any application not marked Allowed uses the distraction timer.")
+                    Text("Return to an allowed app or website to silence an active focus alert.")
                 }
             }
         }
@@ -55,15 +82,6 @@ struct ApplicationRulesView: View {
                 Button(action: chooseApplication) {
                     Label("Add Application", systemImage: "plus")
                 }
-            }
-        }
-        .overlay {
-            if store.configuration.applicationRules.isEmpty {
-                EmptyRulesView(
-                    title: "No application rules",
-                    systemImage: "app.badge.checkmark",
-                    description: "Add the apps that belong to your focus session."
-                )
             }
         }
     }

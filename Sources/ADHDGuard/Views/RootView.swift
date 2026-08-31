@@ -1,6 +1,6 @@
 import SwiftUI
 
-private enum GuardSection: String, CaseIterable, Identifiable {
+enum GuardSection: String, CaseIterable, Identifiable {
     case dashboard
     case applications
     case websites
@@ -27,14 +27,20 @@ private enum GuardSection: String, CaseIterable, Identifiable {
     }
 }
 
+@MainActor
+final class GuardNavigation: ObservableObject {
+    @Published var selection: GuardSection? = .dashboard
+}
+
 struct RootView: View {
     @EnvironmentObject private var store: ConfigurationStore
     @EnvironmentObject private var monitor: GuardMonitor
-    @State private var selection: GuardSection? = .dashboard
+    @EnvironmentObject private var alarm: AlarmController
+    @EnvironmentObject private var navigation: GuardNavigation
 
     var body: some View {
         NavigationSplitView {
-            List(GuardSection.allCases, selection: $selection) { section in
+            List(GuardSection.allCases, selection: $navigation.selection) { section in
                 Label(section.title, systemImage: section.symbol)
                     .tag(section)
             }
@@ -42,7 +48,7 @@ struct RootView: View {
             .navigationSplitViewColumnWidth(min: 180, ideal: 205)
         } detail: {
             Group {
-                switch selection ?? .dashboard {
+                switch navigation.selection ?? .dashboard {
                 case .dashboard:
                     DashboardView()
                 case .applications:
@@ -61,9 +67,15 @@ struct RootView: View {
                     Label("Guard", systemImage: store.configuration.monitoringEnabled ? "shield.fill" : "shield")
                 }
                 .toggleStyle(.switch)
-                .help(store.configuration.monitoringEnabled ? "Stop monitoring" : "Start monitoring")
+                .disabled(alarm.activeAlarm?.kind == .distraction)
+                .help(
+                    alarm.activeAlarm?.kind == .distraction
+                        ? "Return to an allowed context before pausing"
+                        : (store.configuration.monitoringEnabled ? "Stop monitoring" : "Start monitoring")
+                )
             }
         }
+        .tint(GuardPalette.accent)
         .frame(minWidth: 900, minHeight: 620)
         .onAppear { monitor.start() }
     }

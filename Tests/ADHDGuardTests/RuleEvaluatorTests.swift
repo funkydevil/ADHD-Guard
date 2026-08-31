@@ -112,6 +112,19 @@ final class RuleEvaluatorTests: XCTestCase {
         XCTAssertFalse(RuleEvaluator.host("notyoutube.com", matches: "youtube.com"))
     }
 
+    func testMatchingWebsiteRuleUsesBlockedFirstPriority() {
+        let allowed = WebsiteRule(host: "youtube.com", policy: .allowed)
+        let blocked = WebsiteRule(host: "music.youtube.com", policy: .blocked)
+
+        XCTAssertEqual(
+            RuleEvaluator.matchingWebsiteRule(
+                host: "music.youtube.com",
+                rules: [allowed, blocked]
+            ),
+            blocked
+        )
+    }
+
     func testOwnApplicationIsAlwaysFocused() {
         let decision = RuleEvaluator.evaluate(
             context: context(app: "ADHD Guard", bundle: ownBundleIdentifier),
@@ -145,5 +158,99 @@ final class RuleEvaluatorTests: XCTestCase {
             isBrowser: browser,
             idleSeconds: 0
         )
+    }
+}
+
+final class GuardSessionStateTests: XCTestCase {
+    func testDistractedContextChangesKeepOriginalStartTime() {
+        var episode = DistractionEpisode()
+        let start = Date(timeIntervalSince1970: 100)
+
+        XCTAssertEqual(
+            episode.remaining(
+                for: .distracted(detail: "Blocked A", immediate: false),
+                now: start,
+                graceSeconds: 20
+            ),
+            20
+        )
+        XCTAssertEqual(
+            episode.remaining(
+                for: .distracted(detail: "Blocked B", immediate: false),
+                now: start.addingTimeInterval(7),
+                graceSeconds: 20
+            ),
+            13
+        )
+        XCTAssertEqual(episode.startedAt, start)
+    }
+
+    func testAlarmRemainsLatchedUntilFocusedContext() {
+        var episode = DistractionEpisode()
+        let start = Date(timeIntervalSince1970: 100)
+
+        XCTAssertEqual(
+            episode.remaining(
+                for: .distracted(detail: "Blocked", immediate: true),
+                now: start,
+                graceSeconds: 20
+            ),
+            0
+        )
+        XCTAssertEqual(
+            episode.remaining(
+                for: .distracted(detail: "Unlisted", immediate: false),
+                now: start.addingTimeInterval(1),
+                graceSeconds: 20
+            ),
+            0
+        )
+        XCTAssertTrue(episode.isAlarmLatched)
+
+        XCTAssertNil(
+            episode.remaining(
+                for: .focused(detail: "Allowed"),
+                now: start.addingTimeInterval(2),
+                graceSeconds: 20
+            )
+        )
+        XCTAssertFalse(episode.isAlarmLatched)
+        XCTAssertNil(episode.startedAt)
+    }
+
+    func testImmediateBlockLatchesAnExistingGraceEpisode() {
+        var episode = DistractionEpisode()
+        let start = Date(timeIntervalSince1970: 100)
+
+        XCTAssertEqual(
+            episode.remaining(
+                for: .distracted(detail: "Unlisted app", immediate: false),
+                now: start,
+                graceSeconds: 20
+            ),
+            20
+        )
+        XCTAssertEqual(
+            episode.remaining(
+                for: .distracted(detail: "Blocked website", immediate: true),
+                now: start.addingTimeInterval(5),
+                graceSeconds: 20
+            ),
+            0
+        )
+        XCTAssertEqual(episode.startedAt, start)
+        XCTAssertTrue(episode.isAlarmLatched)
+    }
+
+    func testRecentHostsAreNewestFirstDeduplicatedAndCapped() {
+        var history = RecentHostHistory()
+
+        history.record("www.youtube.com")
+        history.record("reddit.com")
+        history.record("news.ycombinator.com")
+        history.record("youtube.com")
+        history.record("example.com")
+
+        XCTAssertEqual(history.hosts, ["example.com", "youtube.com", "news.ycombinator.com"])
     }
 }

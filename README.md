@@ -10,9 +10,10 @@ The optional idle mode also warns when a focused application is open but there h
 - Allowed and blocked website rules with subdomain matching.
 - A configurable distraction grace period.
 - Idle detection and a separate idle phrase.
-- A visible panel across Spaces, repeated system sound, and spoken warning.
+- A compact, click-through focus banner across Spaces, a gentle reminder chime, and an optional spoken warning.
 - A menu bar control plus a full SwiftUI dashboard.
-- Local persistence in `UserDefaults`; active URLs and activity history are not stored.
+- Three recent browser hosts for one-click blocking during the current app session.
+- Local persistence in `UserDefaults`; active URLs and browsing history are not stored between launches.
 - Safari, Google Chrome, Microsoft Edge, Brave, and Arc active-tab readers.
 
 ## Run in development
@@ -42,6 +43,8 @@ On first browser inspection, accept the macOS Automation prompt. If it was denie
 5. Blocked applications alert immediately; allowed applications are focused.
 6. Everything else uses the grace period.
 7. Idle warnings are evaluated only in a focused context.
+
+Once a distraction warning starts, switching between blocked or unlisted apps and sites does not reset it. The warning stops only after ADHD Guard observes an allowed context.
 
 If the browser URL cannot be read, ADHD Guard shows a permission warning and falls back to the application rule. It deliberately avoids a false alarm based only on missing Automation access.
 

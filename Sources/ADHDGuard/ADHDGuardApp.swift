@@ -6,6 +6,7 @@ struct ADHDGuardApp: App {
     @StateObject private var store: ConfigurationStore
     @StateObject private var alarm: AlarmController
     @StateObject private var monitor: GuardMonitor
+    @StateObject private var navigation: GuardNavigation
 
     init() {
         let store = ConfigurationStore()
@@ -13,14 +14,16 @@ struct ADHDGuardApp: App {
         _store = StateObject(wrappedValue: store)
         _alarm = StateObject(wrappedValue: alarm)
         _monitor = StateObject(wrappedValue: GuardMonitor(store: store, alarm: alarm))
+        _navigation = StateObject(wrappedValue: GuardNavigation())
     }
 
     var body: some Scene {
-        WindowGroup {
+        Window("ADHD Guard", id: "main") {
             RootView()
                 .environmentObject(store)
                 .environmentObject(alarm)
                 .environmentObject(monitor)
+                .environmentObject(navigation)
                 .onAppear { monitor.start() }
         }
         .defaultSize(width: 980, height: 680)
@@ -28,16 +31,22 @@ struct ADHDGuardApp: App {
             CommandMenu("Guard") {
                 Toggle("Monitoring", isOn: $store.configuration.monitoringEnabled)
                     .keyboardShortcut("g", modifiers: [.command, .shift])
-                Button("Test Alarm") {
-                    alarm.present(
-                        kind: .test,
-                        title: "ADHD Guard test",
-                        message: "This is how a focus warning will look.",
+                    .disabled(alarm.activeAlarm?.kind == .distraction)
+                Button("Preview Reminder") {
+                    alarm.preview(
                         phrase: store.configuration.focusPhrase,
                         speaks: store.configuration.speaksWarnings,
                         playsSound: store.configuration.playsSound
                     )
                 }
+            }
+
+            CommandGroup(replacing: .appTermination) {
+                Button("Quit ADHD Guard") {
+                    NSApp.terminate(nil)
+                }
+                .keyboardShortcut("q")
+                .disabled(alarm.activeAlarm?.kind == .distraction)
             }
         }
 
@@ -45,6 +54,8 @@ struct ADHDGuardApp: App {
             MenuBarGuardView()
                 .environmentObject(store)
                 .environmentObject(monitor)
+                .environmentObject(alarm)
+                .environmentObject(navigation)
         } label: {
             Label("ADHD Guard", systemImage: store.configuration.monitoringEnabled ? "shield.fill" : "shield")
         }

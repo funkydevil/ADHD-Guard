@@ -74,7 +74,7 @@ enum RuleEvaluator {
         return normalizedCandidate == normalizedRule || normalizedCandidate.hasSuffix(".\(normalizedRule)")
     }
 
-    private static func matchingWebsiteRule(host: String, rules: [WebsiteRule]) -> WebsiteRule? {
+    static func matchingWebsiteRule(host: String, rules: [WebsiteRule]) -> WebsiteRule? {
         // A blocked rule wins if a user accidentally adds the same host to both lists.
         rules.first { $0.policy == .blocked && Self.host(host, matches: $0.host) }
             ?? rules.first { $0.policy == .allowed && Self.host(host, matches: $0.host) }

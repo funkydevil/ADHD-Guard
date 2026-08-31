@@ -16,6 +16,7 @@ rm -rf "$app_dir"
 mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
 cp "$binary_path" "$app_dir/Contents/MacOS/ADHDGuard"
 cp "$project_dir/Resources/Info.plist" "$app_dir/Contents/Info.plist"
+cp "$project_dir/Resources/ADHDGuard.icns" "$app_dir/Contents/Resources/ADHDGuard.icns"
 
 codesign --force --deep --sign - "$app_dir"
 

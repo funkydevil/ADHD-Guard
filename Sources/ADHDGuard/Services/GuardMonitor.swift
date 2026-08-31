@@ -9,12 +9,13 @@ final class GuardMonitor: ObservableObject {
     @Published private(set) var browserAccessMessage: String?
     @Published private(set) var distractionRemaining: Int?
     @Published private(set) var lastDecision: RuleDecision?
+    @Published private(set) var recentVisitedHosts: [String] = []
 
     private let store: ConfigurationStore
     private let alarm: AlarmController
     private var loopTask: Task<Void, Never>?
-    private var distractionStartedAt: Date?
-    private var distractionIdentity: String?
+    private var distractionEpisode = DistractionEpisode()
+    private var recentHostHistory = RecentHostHistory()
     private var lastBrowserReadAt = Date.distantPast
     private var cachedBrowserURL: URL?
     private var cachedBrowserBundleIdentifier: String?
@@ -74,6 +75,7 @@ final class GuardMonitor: ObservableObject {
             idleSeconds: IdleTimeProvider.currentIdleSeconds()
         )
         currentContext = context
+        recordRecentHostIfNeeded(context: context)
 
         let decision = RuleEvaluator.evaluate(
             context: context,
@@ -139,22 +141,19 @@ final class GuardMonitor: ObservableObject {
             }
 
         case let .distracted(detail, immediate):
-            let identity = "\(context.bundleIdentifier)|\(context.browserURL?.host ?? "-")|\(detail)"
-            if distractionIdentity != identity {
-                distractionIdentity = identity
-                distractionStartedAt = Date()
-            }
-
-            let elapsed = Date().timeIntervalSince(distractionStartedAt ?? Date())
-            let remaining = immediate ? 0 : max(0, configuration.distractionGraceSeconds - Int(elapsed))
+            let remaining = distractionEpisode.remaining(
+                for: .distracted(detail: detail, immediate: immediate),
+                now: Date(),
+                graceSeconds: configuration.distractionGraceSeconds
+            ) ?? 0
             distractionRemaining = remaining
 
             if remaining == 0 {
                 statusText = "Distraction limit reached"
                 alarm.present(
                     kind: .distraction,
-                    title: "Go back",
-                    message: detail,
+                    title: "Time to refocus",
+                    message: alarmMessage(from: detail),
                     phrase: configuration.focusPhrase,
                     speaks: configuration.speaksWarnings,
                     playsSound: configuration.playsSound
@@ -167,8 +166,28 @@ final class GuardMonitor: ObservableObject {
     }
 
     private func resetDistraction() {
-        distractionStartedAt = nil
-        distractionIdentity = nil
+        distractionEpisode.reset()
         distractionRemaining = nil
+    }
+
+    private func recordRecentHostIfNeeded(context: ActivityContext) {
+        guard context.isBrowser,
+              let host = context.browserURL?.host else { return }
+
+        recentHostHistory.record(host)
+        recentVisitedHosts = recentHostHistory.hosts
+    }
+
+    private func alarmMessage(from detail: String) -> String {
+        let websitePrefixes = ["Blocked website: ", "Website is outside your allow list: "]
+        for prefix in websitePrefixes where detail.hasPrefix(prefix) {
+            return "You’re on \(detail.dropFirst(prefix.count))"
+        }
+
+        let applicationPrefixes = ["Blocked application: ", "Application is outside your allow list: "]
+        for prefix in applicationPrefixes where detail.hasPrefix(prefix) {
+            return "You’re using \(detail.dropFirst(prefix.count))"
+        }
+        return detail
     }
 }

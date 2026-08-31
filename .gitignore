@@ -4,3 +4,5 @@
 build/
 ADHDGuard.app/
 *.xcuserstate
+.claude-flow/
+.swarm/
