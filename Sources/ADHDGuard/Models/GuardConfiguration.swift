@@ -35,6 +35,14 @@ struct WebsiteRule: Codable, Identifiable, Equatable {
 }
 
 struct GuardConfiguration: Codable, Equatable {
+    static let browserApplicationRules: [ApplicationRule] = [
+        ApplicationRule(name: "Safari", bundleIdentifier: "com.apple.Safari", policy: .allowed),
+        ApplicationRule(name: "Google Chrome", bundleIdentifier: "com.google.Chrome", policy: .allowed),
+        ApplicationRule(name: "Microsoft Edge", bundleIdentifier: "com.microsoft.edgemac", policy: .allowed),
+        ApplicationRule(name: "Brave Browser", bundleIdentifier: "com.brave.Browser", policy: .allowed),
+        ApplicationRule(name: "Arc", bundleIdentifier: "company.thebrowser.Browser", policy: .allowed)
+    ]
+
     var monitoringEnabled = false
     var distractionGraceSeconds = 20
     var idleMonitoringEnabled = false
@@ -47,7 +55,7 @@ struct GuardConfiguration: Codable, Equatable {
         ApplicationRule(name: "Xcode", bundleIdentifier: "com.apple.dt.Xcode", policy: .allowed),
         ApplicationRule(name: "Visual Studio Code", bundleIdentifier: "com.microsoft.VSCode", policy: .allowed),
         ApplicationRule(name: "Codex", bundleIdentifier: "com.openai.codex", policy: .allowed)
-    ]
+    ] + browserApplicationRules
     var websiteRules: [WebsiteRule] = []
 
     static let defaults = GuardConfiguration()

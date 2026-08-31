@@ -8,11 +8,13 @@ The optional idle mode also warns when a focused application is open but there h
 
 - Allowed and blocked application rules selected from installed `.app` bundles.
 - Allowed and blocked website rules with subdomain matching.
+- Supported browsers are allowed as applications by default; their readable active sites are still evaluated first.
 - A configurable distraction grace period.
 - Idle detection and a separate idle phrase.
 - A compact, click-through focus banner across Spaces, a gentle reminder chime, and an optional spoken warning.
 - A menu bar control plus a full SwiftUI dashboard.
 - Three recent browser hosts for one-click blocking during the current app session.
+- Three recent active applications for one-click allowing during the current app session.
 - Local persistence in `UserDefaults`; active URLs and browsing history are not stored between launches.
 - Safari, Google Chrome, Microsoft Edge, Brave, and Arc active-tab readers.
 

@@ -9,16 +9,34 @@ final class ConfigurationStore: ObservableObject {
 
     private let defaults: UserDefaults
     private let storageKey = "adhd-guard.configuration.v1"
+    private let browserRulesMigrationKey = "adhd-guard.migration.browser-rules.v1"
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        var loadedConfiguration: GuardConfiguration
         if let data = defaults.data(forKey: storageKey),
            let saved = try? decoder.decode(GuardConfiguration.self, from: data) {
-            configuration = saved
+            loadedConfiguration = saved
         } else {
-            configuration = .defaults
+            loadedConfiguration = .defaults
+        }
+
+        var addedBrowserRules = false
+        if !defaults.bool(forKey: browserRulesMigrationKey) {
+            for browserRule in GuardConfiguration.browserApplicationRules where !loadedConfiguration.applicationRules.contains(where: {
+                $0.bundleIdentifier.caseInsensitiveCompare(browserRule.bundleIdentifier) == .orderedSame
+            }) {
+                loadedConfiguration.applicationRules.append(browserRule)
+                addedBrowserRules = true
+            }
+            defaults.set(true, forKey: browserRulesMigrationKey)
+        }
+
+        configuration = loadedConfiguration
+        if addedBrowserRules {
+            save()
         }
     }
 

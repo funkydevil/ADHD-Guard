@@ -65,6 +65,21 @@ final class RuleEvaluatorTests: XCTestCase {
         XCTAssertEqual(decision, .distracted(detail: "Blocked website: youtube.com", immediate: true))
     }
 
+    func testSupportedBrowsersAreAllowedByDefault() {
+        let configuredBrowsers = Set(
+            GuardConfiguration.browserApplicationRules.map { $0.bundleIdentifier }
+        )
+        let readableBrowsers = Set(BrowserURLReader.browsers.map { $0.bundleIdentifier })
+
+        XCTAssertEqual(configuredBrowsers, readableBrowsers)
+        XCTAssertTrue(GuardConfiguration.browserApplicationRules.allSatisfy { $0.policy == .allowed })
+        XCTAssertTrue(readableBrowsers.allSatisfy { bundleIdentifier in
+            GuardConfiguration.defaults.applicationRules.contains {
+                $0.bundleIdentifier == bundleIdentifier && $0.policy == .allowed
+            }
+        })
+    }
+
     func testAllowedWebsiteCanFocusAnUnlistedBrowser() {
         let configuration = config(
             websites: [WebsiteRule(host: "developer.apple.com", policy: .allowed)]
@@ -252,5 +267,68 @@ final class GuardSessionStateTests: XCTestCase {
         history.record("example.com")
 
         XCTAssertEqual(history.hosts, ["example.com", "youtube.com", "news.ycombinator.com"])
+    }
+
+    func testRecentApplicationsAreNewestFirstDeduplicatedAndCapped() {
+        var history = RecentApplicationHistory()
+
+        history.record(name: "Finder", bundleIdentifier: "com.apple.finder")
+        history.record(name: "Notes", bundleIdentifier: "com.apple.Notes")
+        history.record(name: "Slack", bundleIdentifier: "com.tinyspeck.slackmacgap")
+        history.record(name: "Finder", bundleIdentifier: "com.apple.finder")
+        history.record(name: "Music", bundleIdentifier: "com.apple.Music")
+
+        XCTAssertEqual(
+            history.applications,
+            [
+                RecentApplication(name: "Music", bundleIdentifier: "com.apple.Music"),
+                RecentApplication(name: "Finder", bundleIdentifier: "com.apple.finder"),
+                RecentApplication(name: "Slack", bundleIdentifier: "com.tinyspeck.slackmacgap")
+            ]
+        )
+    }
+}
+
+@MainActor
+final class ConfigurationStoreTests: XCTestCase {
+    func testBrowserRulesAreMigratedOnceWithoutOverwritingLaterRemoval() throws {
+        let suiteName = "ADHDGuardTests.ConfigurationStore.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        var legacyConfiguration = GuardConfiguration.defaults
+        let browserBundleIdentifiers = Set(
+            GuardConfiguration.browserApplicationRules.map { $0.bundleIdentifier.lowercased() }
+        )
+        legacyConfiguration.applicationRules.removeAll {
+            browserBundleIdentifiers.contains($0.bundleIdentifier.lowercased())
+        }
+        legacyConfiguration.applicationRules.append(
+            ApplicationRule(name: "My App", bundleIdentifier: "com.example.my-app", policy: .blocked)
+        )
+        defaults.set(
+            try JSONEncoder().encode(legacyConfiguration),
+            forKey: "adhd-guard.configuration.v1"
+        )
+
+        let migratedStore = ConfigurationStore(defaults: defaults)
+        XCTAssertTrue(GuardConfiguration.browserApplicationRules.allSatisfy { browser in
+            migratedStore.configuration.applicationRules.contains {
+                $0.bundleIdentifier.caseInsensitiveCompare(browser.bundleIdentifier) == .orderedSame
+                    && $0.policy == .allowed
+            }
+        })
+        XCTAssertTrue(migratedStore.configuration.applicationRules.contains {
+            $0.bundleIdentifier == "com.example.my-app" && $0.policy == .blocked
+        })
+
+        migratedStore.configuration.applicationRules.removeAll {
+            $0.bundleIdentifier == "com.apple.Safari"
+        }
+        let reloadedStore = ConfigurationStore(defaults: defaults)
+
+        XCTAssertFalse(reloadedStore.configuration.applicationRules.contains {
+            $0.bundleIdentifier == "com.apple.Safari"
+        })
     }
 }

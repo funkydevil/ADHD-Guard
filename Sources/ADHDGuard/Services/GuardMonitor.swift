@@ -10,12 +10,14 @@ final class GuardMonitor: ObservableObject {
     @Published private(set) var distractionRemaining: Int?
     @Published private(set) var lastDecision: RuleDecision?
     @Published private(set) var recentVisitedHosts: [String] = []
+    @Published private(set) var recentApplications: [RecentApplication] = []
 
     private let store: ConfigurationStore
     private let alarm: AlarmController
     private var loopTask: Task<Void, Never>?
     private var distractionEpisode = DistractionEpisode()
     private var recentHostHistory = RecentHostHistory()
+    private var recentApplicationHistory = RecentApplicationHistory()
     private var lastBrowserReadAt = Date.distantPast
     private var cachedBrowserURL: URL?
     private var cachedBrowserBundleIdentifier: String?
@@ -75,6 +77,11 @@ final class GuardMonitor: ObservableObject {
             idleSeconds: IdleTimeProvider.currentIdleSeconds()
         )
         currentContext = context
+        recordRecentApplicationIfNeeded(
+            context: context,
+            isOwnApplication: isOwnApplication,
+            isUserVisibleApplication: application.activationPolicy == .regular
+        )
         recordRecentHostIfNeeded(context: context)
 
         let decision = RuleEvaluator.evaluate(
@@ -176,6 +183,21 @@ final class GuardMonitor: ObservableObject {
 
         recentHostHistory.record(host)
         recentVisitedHosts = recentHostHistory.hosts
+    }
+
+    private func recordRecentApplicationIfNeeded(
+        context: ActivityContext,
+        isOwnApplication: Bool,
+        isUserVisibleApplication: Bool
+    ) {
+        guard isUserVisibleApplication,
+              !isOwnApplication,
+              !context.bundleIdentifier.hasPrefix("unknown.") else { return }
+        recentApplicationHistory.record(
+            name: context.applicationName,
+            bundleIdentifier: context.bundleIdentifier
+        )
+        recentApplications = recentApplicationHistory.applications
     }
 
     private func alarmMessage(from detail: String) -> String {

@@ -57,3 +57,34 @@ struct RecentHostHistory: Equatable {
         hosts = Array(hosts.prefix(limit))
     }
 }
+
+struct RecentApplication: Identifiable, Equatable {
+    let name: String
+    let bundleIdentifier: String
+
+    var id: String { bundleIdentifier.lowercased() }
+}
+
+struct RecentApplicationHistory: Equatable {
+    private(set) var applications: [RecentApplication] = []
+    let limit: Int
+
+    init(limit: Int = 3) {
+        self.limit = max(1, limit)
+    }
+
+    mutating func record(name: String, bundleIdentifier: String) {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedBundleIdentifier = bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty, !trimmedBundleIdentifier.isEmpty else { return }
+
+        applications.removeAll {
+            $0.bundleIdentifier.caseInsensitiveCompare(trimmedBundleIdentifier) == .orderedSame
+        }
+        applications.insert(
+            RecentApplication(name: trimmedName, bundleIdentifier: trimmedBundleIdentifier),
+            at: 0
+        )
+        applications = Array(applications.prefix(limit))
+    }
+}

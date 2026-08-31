@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct ApplicationRulesView: View {
     @EnvironmentObject private var store: ConfigurationStore
+    @EnvironmentObject private var monitor: GuardMonitor
 
     var body: some View {
         VStack(spacing: 0) {
@@ -25,6 +26,22 @@ struct ApplicationRulesView: View {
             Divider()
 
             List {
+                if !monitor.recentApplications.isEmpty {
+                    Section {
+                        ForEach(monitor.recentApplications) { application in
+                            RecentApplicationRow(
+                                application: application,
+                                policy: applicationRule(for: application)?.policy,
+                                onAllow: { allow(application) }
+                            )
+                        }
+                    } header: {
+                        Text("Recently active")
+                    } footer: {
+                        Text("The last three active apps from this session · activity history is not saved")
+                    }
+                }
+
                 Section {
                     if store.configuration.applicationRules.isEmpty {
                         EmptyRulesView(
@@ -117,5 +134,86 @@ struct ApplicationRulesView: View {
 
     private func remove(_ id: UUID) {
         store.configuration.applicationRules.removeAll { $0.id == id }
+    }
+
+    private func applicationRule(for application: RecentApplication) -> ApplicationRule? {
+        store.configuration.applicationRules.first {
+            $0.bundleIdentifier.caseInsensitiveCompare(application.bundleIdentifier) == .orderedSame
+        }
+    }
+
+    private func allow(_ application: RecentApplication) {
+        if let index = store.configuration.applicationRules.firstIndex(where: {
+            $0.bundleIdentifier.caseInsensitiveCompare(application.bundleIdentifier) == .orderedSame
+        }) {
+            store.configuration.applicationRules[index].name = application.name
+            store.configuration.applicationRules[index].policy = .allowed
+        } else {
+            store.configuration.applicationRules.append(
+                ApplicationRule(
+                    name: application.name,
+                    bundleIdentifier: application.bundleIdentifier,
+                    policy: .allowed
+                )
+            )
+        }
+    }
+}
+
+private struct RecentApplicationRow: View {
+    let application: RecentApplication
+    let policy: RulePolicy?
+    let onAllow: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ApplicationIcon(bundleIdentifier: application.bundleIdentifier)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(application.name)
+                    .font(.headline)
+                Text(application.bundleIdentifier)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if let policy {
+                StatusBadge(
+                    title: policy.title,
+                    color: policy == .allowed ? GuardPalette.focused : GuardPalette.alarm
+                )
+            }
+
+            if policy != .allowed {
+                Button("Allow", action: onAllow)
+                    .buttonStyle(.bordered)
+                    .tint(GuardPalette.focused)
+            }
+        }
+        .padding(.vertical, 3)
+    }
+}
+
+private struct ApplicationIcon: View {
+    let bundleIdentifier: String
+
+    var body: some View {
+        Group {
+            if let applicationURL = NSWorkspace.shared.urlForApplication(
+                withBundleIdentifier: bundleIdentifier
+            ) {
+                Image(nsImage: NSWorkspace.shared.icon(forFile: applicationURL.path))
+                    .resizable()
+            } else {
+                Image(systemName: "app")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(.secondary)
+                    .padding(4)
+            }
+        }
+        .frame(width: 28, height: 28)
     }
 }
