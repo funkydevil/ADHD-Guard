@@ -10,6 +10,7 @@ final class ConfigurationStore: ObservableObject {
     private let defaults: UserDefaults
     private let storageKey = "adhd-guard.configuration.v1"
     private let browserRulesMigrationKey = "adhd-guard.migration.browser-rules.v1"
+    private let defaultWebsiteRulesMigrationKey = "adhd-guard.migration.default-website-rules.v1"
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
@@ -34,8 +35,26 @@ final class ConfigurationStore: ObservableObject {
             defaults.set(true, forKey: browserRulesMigrationKey)
         }
 
+        var updatedWebsiteRules = false
+        if !defaults.bool(forKey: defaultWebsiteRulesMigrationKey) {
+            for defaultRule in GuardConfiguration.defaultWebsiteRules {
+                if let existingIndex = loadedConfiguration.websiteRules.firstIndex(where: {
+                    $0.host.caseInsensitiveCompare(defaultRule.host) == .orderedSame
+                }) {
+                    if loadedConfiguration.websiteRules[existingIndex].policy != defaultRule.policy {
+                        loadedConfiguration.websiteRules[existingIndex].policy = defaultRule.policy
+                        updatedWebsiteRules = true
+                    }
+                } else {
+                    loadedConfiguration.websiteRules.append(defaultRule)
+                    updatedWebsiteRules = true
+                }
+            }
+            defaults.set(true, forKey: defaultWebsiteRulesMigrationKey)
+        }
+
         configuration = loadedConfiguration
-        if addedBrowserRules {
+        if addedBrowserRules || updatedWebsiteRules {
             save()
         }
     }
