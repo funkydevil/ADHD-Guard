@@ -4,14 +4,31 @@ import Combine
 import SwiftUI
 
 @MainActor
-final class AlarmController: ObservableObject {
+final class AlarmController: NSObject, ObservableObject, NSWindowDelegate {
     @Published private(set) var activeAlarm: AlarmPresentation?
 
+    private let panelSize = NSSize(width: 560, height: 72)
+    private let panelEdgeInset: CGFloat = 16
+    private let panelPositionKeyPrefix = "adhd-guard.alarm-position."
     private let speechSynthesizer = NSSpeechSynthesizer()
     private let previewSpeechSynthesizer = NSSpeechSynthesizer()
     private var panels: [NSNumber: NSPanel] = [:]
+    private var panelScreenIdentifiers: [ObjectIdentifier: NSNumber] = [:]
+    private var isUpdatingPanelFrame = false
+    private var screenParametersCancellable: AnyCancellable?
     private var repeatTask: Task<Void, Never>?
     private var previewTask: Task<Void, Never>?
+
+    override init() {
+        super.init()
+        screenParametersCancellable = NotificationCenter.default
+            .publisher(for: NSApplication.didChangeScreenParametersNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self, let activeAlarm = self.activeAlarm else { return }
+                self.showPanels(alarm: activeAlarm)
+            }
+    }
 
     func present(
         kind: AlarmKind,
@@ -69,15 +86,24 @@ final class AlarmController: ObservableObject {
 
         for screen in NSScreen.screens {
             guard let identifier = screenIdentifier(screen) else { continue }
-            let panel = panels[identifier] ?? makePanel()
-            panels[identifier] = panel
-            panel.contentView = NSHostingView(rootView: AlarmOverlayView(alarm: alarm))
-            position(panel, on: screen)
+            let panel: NSPanel
+            if let existingPanel = panels[identifier] {
+                panel = existingPanel
+            } else {
+                panel = makePanel()
+                panels[identifier] = panel
+                panelScreenIdentifiers[ObjectIdentifier(panel)] = identifier
+            }
+            panel.contentView = DraggableHostingView(rootView: AlarmOverlayView(alarm: alarm))
+            position(panel, on: screen, identifier: identifier)
             panel.orderFrontRegardless()
         }
 
         for identifier in Array(panels.keys) where !activeScreenIDs.contains(identifier) {
-            panels[identifier]?.orderOut(nil)
+            if let panel = panels[identifier] {
+                panel.orderOut(nil)
+                panelScreenIdentifiers[ObjectIdentifier(panel)] = nil
+            }
             panels[identifier] = nil
         }
     }
@@ -97,31 +123,109 @@ final class AlarmController: ObservableObject {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
-        panel.ignoresMouseEvents = true
-        panel.isMovable = false
+        panel.ignoresMouseEvents = false
+        panel.isMovable = true
+        panel.isMovableByWindowBackground = true
         panel.isReleasedWhenClosed = false
         panel.animationBehavior = .none
+        panel.delegate = self
         return panel
     }
 
     private func positionPanels() {
         for screen in NSScreen.screens {
             guard let identifier = screenIdentifier(screen), let panel = panels[identifier] else { continue }
-            position(panel, on: screen)
+            position(panel, on: screen, identifier: identifier)
         }
     }
 
-    private func position(_ panel: NSPanel, on screen: NSScreen) {
-        let height: CGFloat = 92
-        panel.setFrame(
-            NSRect(
-                x: screen.frame.minX,
-                y: screen.visibleFrame.maxY - height,
-                width: screen.frame.width,
-                height: height
-            ),
-            display: true
+    private func position(_ panel: NSPanel, on screen: NSScreen, identifier: NSNumber) {
+        let visibleFrame = screen.visibleFrame
+        let size = NSSize(
+            width: min(panelSize.width, visibleFrame.width - panelEdgeInset * 2),
+            height: min(panelSize.height, visibleFrame.height - panelEdgeInset * 2)
         )
+        let origin = storedOrigin(for: identifier, in: visibleFrame, panelSize: size)
+            ?? NSPoint(x: visibleFrame.midX - size.width / 2, y: visibleFrame.midY - size.height / 2)
+
+        setFrame(NSRect(origin: origin, size: size), for: panel)
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        guard !isUpdatingPanelFrame,
+              let panel = notification.object as? NSPanel,
+              let identifier = panelScreenIdentifiers[ObjectIdentifier(panel)],
+              let screen = NSScreen.screens.first(where: { screenIdentifier($0) == identifier }) else {
+            return
+        }
+
+        let constrainedOrigin = constrainedOrigin(
+            panel.frame.origin,
+            panelSize: panel.frame.size,
+            in: screen.visibleFrame
+        )
+        if constrainedOrigin != panel.frame.origin {
+            setFrame(NSRect(origin: constrainedOrigin, size: panel.frame.size), for: panel)
+        }
+        store(origin: constrainedOrigin, panelSize: panel.frame.size, on: screen, identifier: identifier)
+    }
+
+    private func setFrame(_ frame: NSRect, for panel: NSPanel) {
+        isUpdatingPanelFrame = true
+        panel.setFrame(frame, display: true)
+        isUpdatingPanelFrame = false
+    }
+
+    private func constrainedOrigin(_ origin: NSPoint, panelSize: NSSize, in visibleFrame: NSRect) -> NSPoint {
+        let minimumX = visibleFrame.minX + panelEdgeInset
+        let maximumX = max(minimumX, visibleFrame.maxX - panelSize.width - panelEdgeInset)
+        let minimumY = visibleFrame.minY + panelEdgeInset
+        let maximumY = max(minimumY, visibleFrame.maxY - panelSize.height - panelEdgeInset)
+
+        return NSPoint(
+            x: min(max(origin.x, minimumX), maximumX),
+            y: min(max(origin.y, minimumY), maximumY)
+        )
+    }
+
+    private func store(origin: NSPoint, panelSize: NSSize, on screen: NSScreen, identifier: NSNumber) {
+        let visibleFrame = screen.visibleFrame
+        let minimumX = visibleFrame.minX + panelEdgeInset
+        let minimumY = visibleFrame.minY + panelEdgeInset
+        let horizontalTravel = max(visibleFrame.width - panelSize.width - panelEdgeInset * 2, 1)
+        let verticalTravel = max(visibleFrame.height - panelSize.height - panelEdgeInset * 2, 1)
+        let normalizedX = min(max((origin.x - minimumX) / horizontalTravel, 0), 1)
+        let normalizedY = min(max((origin.y - minimumY) / verticalTravel, 0), 1)
+
+        UserDefaults.standard.set(
+            ["x": Double(normalizedX), "y": Double(normalizedY)],
+            forKey: panelPositionKey(for: identifier)
+        )
+    }
+
+    private func storedOrigin(for identifier: NSNumber, in visibleFrame: NSRect, panelSize: NSSize) -> NSPoint? {
+        guard let position = UserDefaults.standard.dictionary(forKey: panelPositionKey(for: identifier)),
+              let normalizedX = position["x"] as? Double,
+              let normalizedY = position["y"] as? Double else {
+            return nil
+        }
+
+        let minimumX = visibleFrame.minX + panelEdgeInset
+        let minimumY = visibleFrame.minY + panelEdgeInset
+        let horizontalTravel = max(visibleFrame.width - panelSize.width - panelEdgeInset * 2, 1)
+        let verticalTravel = max(visibleFrame.height - panelSize.height - panelEdgeInset * 2, 1)
+        return constrainedOrigin(
+            NSPoint(
+                x: minimumX + horizontalTravel * CGFloat(normalizedX),
+                y: minimumY + verticalTravel * CGFloat(normalizedY)
+            ),
+            panelSize: panelSize,
+            in: visibleFrame
+        )
+    }
+
+    private func panelPositionKey(for identifier: NSNumber) -> String {
+        panelPositionKeyPrefix + identifier.stringValue
     }
 
     private func screenIdentifier(_ screen: NSScreen) -> NSNumber? {
@@ -182,4 +286,8 @@ final class AlarmController: ObservableObject {
             AudioServicesPlayAlertSound(kSystemSoundID_UserPreferredAlert)
         }
     }
+}
+
+private final class DraggableHostingView<Content: View>: NSHostingView<Content> {
+    override var mouseDownCanMoveWindow: Bool { true }
 }

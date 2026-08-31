@@ -4,50 +4,59 @@ struct AlarmOverlayView: View {
     let alarm: AlarmPresentation
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
             Image(systemName: alarm.kind == .idle ? "figure.walk.motion" : "scope")
-                .font(.system(size: 28, weight: .semibold))
-                .frame(width: 42, height: 42)
-                .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .font(.system(size: 21, weight: .semibold))
+                .frame(width: 34, height: 34)
+                .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(alarm.title)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                 Text(alarm.message)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.82))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.92))
                     .lineLimit(1)
             }
 
-            Spacer(minLength: 24)
+            Spacer(minLength: 12)
 
-            Label(instruction, systemImage: "arrow.right.circle.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.9))
-                .lineLimit(2)
-                .multilineTextAlignment(.trailing)
+            VStack(alignment: .trailing, spacing: 2) {
+                Label("Drag to move", systemImage: "hand.draw.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(instruction)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .lineLimit(1)
+            }
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(alarm.kind == .idle ? Color(red: 0.70, green: 0.42, blue: 0.00) : Color(red: 0.62, green: 0.13, blue: 0.16))
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(.black.opacity(0.16))
-                .frame(height: 1)
+        .contentShape(Rectangle())
+        .background(backgroundColor, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(.white.opacity(0.16), lineWidth: 1)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(alarm.title). \(alarm.message)")
-        .accessibilityHint(instruction)
+        .accessibilityHint("Drag to move. \(instruction)")
+    }
+
+    private var backgroundColor: Color {
+        alarm.kind == .idle
+            ? Color(red: 0.48, green: 0.25, blue: 0.00)
+            : Color(red: 0.62, green: 0.13, blue: 0.16)
     }
 
     private var instruction: String {
         switch alarm.kind {
         case .distraction:
-            "Return to an allowed context to silence this alert"
+            "Allowed context silences this alert"
         case .idle:
-            "Move the pointer or press a key to silence this alert"
+            "Activity silences this alert"
         case .test:
             "Preview"
         }
