@@ -20,18 +20,13 @@ The optional idle mode also warns when a focused application is open but there h
 
 ## Run in development
 
-Requirements: macOS 13 or newer and Xcode Command Line Tools.
+Requirements: macOS 13 or newer and Xcode 14 or newer.
+
+Open `ADHDGuard.xcodeproj`, select the `ADHDGuard` scheme, and run the app. You can also build and test it from Terminal:
 
 ```bash
-swift test
-swift run ADHDGuard
-```
-
-Running the bare Swift Package is convenient for development, but macOS may attribute Automation permission to the launching terminal. For realistic permissions, build and launch the app bundle:
-
-```bash
-./scripts/build-app.sh
-open build/ADHDGuard.app
+xcodebuild -project ADHDGuard.xcodeproj -scheme ADHDGuard -destination 'platform=macOS' build
+xcodebuild -project ADHDGuard.xcodeproj -scheme ADHDGuard -destination 'platform=macOS' test
 ```
 
 On first browser inspection, accept the macOS Automation prompt. If it was denied, open **System Settings → Privacy & Security → Automation** and enable the relevant browser under ADHD Guard.
@@ -55,4 +50,4 @@ If the browser URL cannot be read, ADHD Guard shows a permission warning and fal
 - This is a warning and accountability tool, not a hard blocker. It does not close apps, navigate tabs, or intercept network traffic.
 - Browser URL support depends on each browser's AppleScript interface and macOS Automation permission.
 - Rules are global. Named focus profiles and schedules are natural next steps.
-- The app is ad-hoc signed by the build script for local use; distribution requires an Apple Developer ID, hardened runtime, notarization, and a release bundle identifier.
+- The Xcode target enables the hardened runtime and Apple Events entitlement. Distribution still requires selecting an Apple Developer team, Developer ID signing, and notarization.
