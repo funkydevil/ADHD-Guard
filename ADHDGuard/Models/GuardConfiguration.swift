@@ -1,50 +1,27 @@
 import Foundation
 
-enum RulePolicy: String, Codable, CaseIterable, Identifiable {
-    case allowed
-    case blocked
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .allowed: "Allowed"
-        case .blocked: "Blocked"
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .allowed: "checkmark.circle.fill"
-        case .blocked: "hand.raised.fill"
-        }
-    }
-}
-
 struct ApplicationRule: Codable, Identifiable, Equatable {
     var id = UUID()
     var name: String
     var bundleIdentifier: String
-    var policy: RulePolicy
 }
 
 struct WebsiteRule: Codable, Identifiable, Equatable {
     var id = UUID()
     var host: String
-    var policy: RulePolicy
 }
 
 struct GuardConfiguration: Codable, Equatable {
     static let defaultWebsiteRules: [WebsiteRule] = [
-        WebsiteRule(host: "youtube.com", policy: .blocked)
+        WebsiteRule(host: "youtube.com")
     ]
 
     static let browserApplicationRules: [ApplicationRule] = [
-        ApplicationRule(name: "Safari", bundleIdentifier: "com.apple.Safari", policy: .allowed),
-        ApplicationRule(name: "Google Chrome", bundleIdentifier: "com.google.Chrome", policy: .allowed),
-        ApplicationRule(name: "Microsoft Edge", bundleIdentifier: "com.microsoft.edgemac", policy: .allowed),
-        ApplicationRule(name: "Brave Browser", bundleIdentifier: "com.brave.Browser", policy: .allowed),
-        ApplicationRule(name: "Arc", bundleIdentifier: "company.thebrowser.Browser", policy: .allowed)
+        ApplicationRule(name: "Safari", bundleIdentifier: "com.apple.Safari"),
+        ApplicationRule(name: "Google Chrome", bundleIdentifier: "com.google.Chrome"),
+        ApplicationRule(name: "Microsoft Edge", bundleIdentifier: "com.microsoft.edgemac"),
+        ApplicationRule(name: "Brave Browser", bundleIdentifier: "com.brave.Browser"),
+        ApplicationRule(name: "Arc", bundleIdentifier: "company.thebrowser.Browser")
     ]
 
     var monitoringEnabled = false
@@ -56,9 +33,9 @@ struct GuardConfiguration: Codable, Equatable {
     var focusPhrase = "Go back. Stop. Get back to work."
     var idlePhrase = "Stop procrastinating. Get back to work."
     var applicationRules: [ApplicationRule] = [
-        ApplicationRule(name: "Xcode", bundleIdentifier: "com.apple.dt.Xcode", policy: .allowed),
-        ApplicationRule(name: "Visual Studio Code", bundleIdentifier: "com.microsoft.VSCode", policy: .allowed),
-        ApplicationRule(name: "Codex", bundleIdentifier: "com.openai.codex", policy: .allowed)
+        ApplicationRule(name: "Xcode", bundleIdentifier: "com.apple.dt.Xcode"),
+        ApplicationRule(name: "Visual Studio Code", bundleIdentifier: "com.microsoft.VSCode"),
+        ApplicationRule(name: "Codex", bundleIdentifier: "com.openai.codex")
     ] + browserApplicationRules
     var websiteRules: [WebsiteRule] = defaultWebsiteRules
 

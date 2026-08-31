@@ -70,7 +70,7 @@ struct RootView: View {
                 .disabled(alarm.activeAlarm?.kind == .distraction)
                 .help(
                     alarm.activeAlarm?.kind == .distraction
-                        ? "Return to an allowed context before pausing"
+                        ? "Return to a focused context before pausing"
                         : (store.configuration.monitoringEnabled ? "Stop monitoring" : "Start monitoring")
                 )
             }

@@ -54,7 +54,7 @@ struct MenuBarGuardView: View {
             .buttonStyle(.plain)
             .keyboardShortcut("q")
             .disabled(isDistractionAlertActive)
-            .help(isDistractionAlertActive ? "Return to an allowed context before quitting" : "Quit ADHD Guard")
+            .help(isDistractionAlertActive ? "Return to a focused context before quitting" : "Quit ADHD Guard")
         }
         .padding(16)
         .frame(width: 316)
@@ -117,7 +117,7 @@ struct MenuBarGuardView: View {
 
     private var toggleDetail: String {
         isDistractionAlertActive
-            ? "Return to an allowed context before pausing"
+            ? "Return to a focused context before pausing"
             : "Watch active apps and browser tabs"
     }
 

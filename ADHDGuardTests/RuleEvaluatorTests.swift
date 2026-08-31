@@ -5,9 +5,9 @@ import XCTest
 final class RuleEvaluatorTests: XCTestCase {
     private let ownBundleIdentifier = "com.funkydevil.ADHDGuard"
 
-    func testAllowedApplicationIsFocused() {
+    func testApplicationInFocusListIsFocused() {
         let configuration = config(
-            applications: [ApplicationRule(name: "Xcode", bundleIdentifier: "com.apple.dt.Xcode", policy: .allowed)]
+            applications: [ApplicationRule(name: "Xcode", bundleIdentifier: "com.apple.dt.Xcode")]
         )
 
         let decision = RuleEvaluator.evaluate(
@@ -16,21 +16,7 @@ final class RuleEvaluatorTests: XCTestCase {
             ownBundleIdentifier: ownBundleIdentifier
         )
 
-        XCTAssertEqual(decision, .focused(detail: "Allowed application: Xcode"))
-    }
-
-    func testBlockedApplicationAlertsImmediately() {
-        let configuration = config(
-            applications: [ApplicationRule(name: "Games", bundleIdentifier: "com.example.game", policy: .blocked)]
-        )
-
-        let decision = RuleEvaluator.evaluate(
-            context: context(app: "Games", bundle: "com.example.game"),
-            configuration: configuration,
-            ownBundleIdentifier: ownBundleIdentifier
-        )
-
-        XCTAssertEqual(decision, .distracted(detail: "Blocked application: Games", immediate: true))
+        XCTAssertEqual(decision, .focused(detail: "Focus application: Xcode"))
     }
 
     func testUnlistedApplicationUsesGracePeriod() {
@@ -42,14 +28,14 @@ final class RuleEvaluatorTests: XCTestCase {
 
         XCTAssertEqual(
             decision,
-            .distracted(detail: "Application is outside your allow list: Messages", immediate: false)
+            .distracted(detail: "Application outside focus list: Messages", immediate: false)
         )
     }
 
-    func testBlockedWebsiteOverridesAllowedBrowserAndUsesBuffer() {
+    func testWebsiteInOutsideFocusListOverridesFocusBrowserAndUsesBuffer() {
         let configuration = config(
-            applications: [ApplicationRule(name: "Safari", bundleIdentifier: "com.apple.Safari", policy: .allowed)],
-            websites: [WebsiteRule(host: "youtube.com", policy: .blocked)]
+            applications: [ApplicationRule(name: "Safari", bundleIdentifier: "com.apple.Safari")],
+            websites: [WebsiteRule(host: "youtube.com")]
         )
 
         let decision = RuleEvaluator.evaluate(
@@ -63,27 +49,27 @@ final class RuleEvaluatorTests: XCTestCase {
             ownBundleIdentifier: ownBundleIdentifier
         )
 
-        XCTAssertEqual(decision, .distracted(detail: "Blocked website: youtube.com", immediate: false))
+        XCTAssertEqual(decision, .distracted(detail: "Website outside focus: youtube.com", immediate: false))
     }
 
-    func testSupportedBrowsersAreAllowedByDefault() {
+    func testSupportedBrowsersAreFocusAppsByDefault() {
         let configuredBrowsers = Set(
             GuardConfiguration.browserApplicationRules.map { $0.bundleIdentifier }
         )
         let readableBrowsers = Set(BrowserURLReader.browsers.map { $0.bundleIdentifier })
 
         XCTAssertEqual(configuredBrowsers, readableBrowsers)
-        XCTAssertTrue(GuardConfiguration.browserApplicationRules.allSatisfy { $0.policy == .allowed })
         XCTAssertTrue(readableBrowsers.allSatisfy { bundleIdentifier in
             GuardConfiguration.defaults.applicationRules.contains {
-                $0.bundleIdentifier == bundleIdentifier && $0.policy == .allowed
+                $0.bundleIdentifier == bundleIdentifier
             }
         })
     }
 
-    func testAllowedWebsiteCanFocusAnUnlistedBrowser() {
+    func testWebsiteNotInOutsideFocusListUsesApplicationDecision() {
         let configuration = config(
-            websites: [WebsiteRule(host: "developer.apple.com", policy: .allowed)]
+            applications: [ApplicationRule(name: "Safari", bundleIdentifier: "com.apple.Safari")],
+            websites: [WebsiteRule(host: "youtube.com")]
         )
 
         let decision = RuleEvaluator.evaluate(
@@ -97,29 +83,7 @@ final class RuleEvaluatorTests: XCTestCase {
             ownBundleIdentifier: ownBundleIdentifier
         )
 
-        XCTAssertEqual(decision, .focused(detail: "Allowed website: developer.apple.com"))
-    }
-
-    func testWebsiteOutsideNonemptyAllowListUsesGracePeriod() {
-        let configuration = config(
-            websites: [WebsiteRule(host: "developer.apple.com", policy: .allowed)]
-        )
-
-        let decision = RuleEvaluator.evaluate(
-            context: context(
-                app: "Safari",
-                bundle: "com.apple.Safari",
-                url: URL(string: "https://news.example.com"),
-                browser: true
-            ),
-            configuration: configuration,
-            ownBundleIdentifier: ownBundleIdentifier
-        )
-
-        XCTAssertEqual(
-            decision,
-            .distracted(detail: "Website is outside your allow list: news.example.com", immediate: false)
-        )
+        XCTAssertEqual(decision, .focused(detail: "Focus application: Safari"))
     }
 
     func testHostMatchingIncludesSubdomainsButNotLookalikes() {
@@ -128,16 +92,15 @@ final class RuleEvaluatorTests: XCTestCase {
         XCTAssertFalse(RuleEvaluator.host("notyoutube.com", matches: "youtube.com"))
     }
 
-    func testMatchingWebsiteRuleUsesBlockedFirstPriority() {
-        let allowed = WebsiteRule(host: "youtube.com", policy: .allowed)
-        let blocked = WebsiteRule(host: "music.youtube.com", policy: .blocked)
+    func testMatchingWebsiteRuleReturnsMatchingEntry() {
+        let rule = WebsiteRule(host: "youtube.com")
 
         XCTAssertEqual(
             RuleEvaluator.matchingWebsiteRule(
                 host: "music.youtube.com",
-                rules: [allowed, blocked]
+                rules: [rule]
             ),
-            blocked
+            rule
         )
     }
 
@@ -477,9 +440,9 @@ private enum LaunchAtLoginTestError: LocalizedError {
 
 @MainActor
 final class ConfigurationStoreTests: XCTestCase {
-    func testYouTubeIsBlockedByDefault() {
+    func testYouTubeIsOutsideFocusByDefault() {
         XCTAssertTrue(GuardConfiguration.defaults.websiteRules.contains {
-            $0.host == "youtube.com" && $0.policy == .blocked
+            $0.host == "youtube.com"
         })
     }
 
@@ -489,7 +452,7 @@ final class ConfigurationStoreTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         var legacyConfiguration = GuardConfiguration.defaults
-        legacyConfiguration.websiteRules = [WebsiteRule(host: "youtube.com", policy: .allowed)]
+        legacyConfiguration.websiteRules = [WebsiteRule(host: "youtube.com")]
         defaults.set(
             try JSONEncoder().encode(legacyConfiguration),
             forKey: "adhd-guard.configuration.v1"
@@ -497,13 +460,54 @@ final class ConfigurationStoreTests: XCTestCase {
 
         let migratedStore = ConfigurationStore(defaults: defaults)
         XCTAssertTrue(migratedStore.configuration.websiteRules.contains {
-            $0.host == "youtube.com" && $0.policy == .blocked
+            $0.host == "youtube.com"
         })
 
         migratedStore.configuration.websiteRules.removeAll { $0.host == "youtube.com" }
         let reloadedStore = ConfigurationStore(defaults: defaults)
 
         XCTAssertFalse(reloadedStore.configuration.websiteRules.contains { $0.host == "youtube.com" })
+    }
+
+    func testLegacyPoliciesAreIgnoredWithoutLosingSavedEntries() throws {
+        let suiteName = "ADHDGuardTests.ConfigurationStore.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        var legacyConfiguration = GuardConfiguration.defaults
+        legacyConfiguration.applicationRules = [
+            ApplicationRule(name: "Legacy App", bundleIdentifier: "com.example.legacy")
+        ]
+        legacyConfiguration.websiteRules = [WebsiteRule(host: "legacy.example")]
+
+        let encoded = try JSONEncoder().encode(legacyConfiguration)
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        var applicationRules = try XCTUnwrap(object["applicationRules"] as? [[String: Any]])
+        applicationRules[0]["policy"] = "blocked"
+        object["applicationRules"] = applicationRules
+        var websiteRules = try XCTUnwrap(object["websiteRules"] as? [[String: Any]])
+        websiteRules[0]["policy"] = "allowed"
+        object["websiteRules"] = websiteRules
+
+        defaults.set(
+            try JSONSerialization.data(withJSONObject: object),
+            forKey: "adhd-guard.configuration.v1"
+        )
+        defaults.set(true, forKey: "adhd-guard.migration.browser-rules.v1")
+        defaults.set(true, forKey: "adhd-guard.migration.default-website-rules.v1")
+
+        let store = ConfigurationStore(defaults: defaults)
+
+        XCTAssertEqual(store.configuration.applicationRules.count, 1)
+        XCTAssertEqual(store.configuration.applicationRules.first?.name, "Legacy App")
+        XCTAssertEqual(
+            store.configuration.applicationRules.first?.bundleIdentifier,
+            "com.example.legacy"
+        )
+        XCTAssertEqual(store.configuration.websiteRules.count, 1)
+        XCTAssertEqual(store.configuration.websiteRules.first?.host, "legacy.example")
     }
 
     func testBrowserRulesAreMigratedOnceWithoutOverwritingLaterRemoval() throws {
@@ -519,7 +523,7 @@ final class ConfigurationStoreTests: XCTestCase {
             browserBundleIdentifiers.contains($0.bundleIdentifier.lowercased())
         }
         legacyConfiguration.applicationRules.append(
-            ApplicationRule(name: "My App", bundleIdentifier: "com.example.my-app", policy: .blocked)
+            ApplicationRule(name: "My App", bundleIdentifier: "com.example.my-app")
         )
         defaults.set(
             try JSONEncoder().encode(legacyConfiguration),
@@ -530,11 +534,10 @@ final class ConfigurationStoreTests: XCTestCase {
         XCTAssertTrue(GuardConfiguration.browserApplicationRules.allSatisfy { browser in
             migratedStore.configuration.applicationRules.contains {
                 $0.bundleIdentifier.caseInsensitiveCompare(browser.bundleIdentifier) == .orderedSame
-                    && $0.policy == .allowed
             }
         })
         XCTAssertTrue(migratedStore.configuration.applicationRules.contains {
-            $0.bundleIdentifier == "com.example.my-app" && $0.policy == .blocked
+            $0.bundleIdentifier == "com.example.my-app"
         })
 
         migratedStore.configuration.applicationRules.removeAll {

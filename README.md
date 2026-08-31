@@ -1,21 +1,21 @@
 # ADHD Guard for macOS
 
-ADHD Guard watches the frontmost application and, for supported browsers, the active tab. Website distractions and unlisted applications receive a configurable grace period before an always-on-top warning repeats a sound and spoken phrase. Explicitly blocked applications alert immediately.
+ADHD Guard watches the frontmost application and, for supported browsers, the active tab. Websites in the outside-focus list and applications outside the focus-app list receive a configurable grace period before an always-on-top warning repeats a sound and spoken phrase.
 
 The optional idle mode also warns when a focused application is open but there has been no keyboard or mouse input for the configured duration.
 
 ## Included in this MVP
 
-- Allowed and blocked application rules selected from installed `.app` bundles.
-- Allowed and blocked website rules with subdomain matching.
-- Supported browsers are allowed as applications by default; their readable active sites are still evaluated first.
+- A focus-app list selected from installed `.app` bundles.
+- An outside-focus website list with subdomain matching.
+- Supported browsers are focus apps by default; websites in the outside-focus list are still evaluated first.
 - A configurable distraction grace period.
 - Idle detection and a separate idle phrase.
 - A compact, interactive focus banner across Spaces, a gentle reminder chime, and an optional spoken warning.
-- Clicking a warning returns to the last allowed app or browser tab; if that tab was closed, the saved in-memory URL opens in the same browser.
+- Clicking a warning returns to the last focused app or browser tab; if that tab was closed, the saved in-memory URL opens in the same browser.
 - A menu bar control plus a full SwiftUI dashboard.
-- Three recent browser hosts for one-click blocking during the current app session.
-- Three recent active applications for one-click allowing during the current app session.
+- Three recent browser hosts for one-click addition to the outside-focus list during the current app session.
+- Three recent active applications for one-click addition to the focus-app list during the current app session.
 - Local persistence in `UserDefaults`; active URLs and browsing history are not stored between launches.
 - Safari, Google Chrome, Microsoft Edge, Brave, and Arc active-tab readers.
 
@@ -37,14 +37,12 @@ On first browser inspection, accept the macOS Automation prompt. If it was denie
 ## Rule priority
 
 1. ADHD Guard itself is always focused so its settings remain usable.
-2. A blocked website wins and uses the configured grace period.
-3. An allowed website counts as focused, even if the browser is not separately allowed.
-4. When any allowed website exists, other readable browser sites use the grace period.
-5. Blocked applications alert immediately; allowed applications are focused.
-6. Everything else uses the grace period.
-7. Idle warnings are evaluated only in a focused context.
+2. A website in the outside-focus list uses the configured grace period.
+3. An application in the focus-app list is focused.
+4. Every other application uses the configured grace period.
+5. Idle warnings are evaluated only in a focused context.
 
-Once a distraction warning starts, switching between blocked or unlisted apps and sites does not reset it. The warning stops only after ADHD Guard observes an allowed context.
+Once a distraction warning starts, switching between outside-focus websites and unlisted apps does not reset it. The warning stops only after ADHD Guard observes a focused context.
 
 If the browser URL cannot be read, ADHD Guard shows a permission warning and falls back to the application rule. It deliberately avoids a false alarm based only on missing Automation access.
 

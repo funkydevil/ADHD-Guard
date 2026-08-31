@@ -281,12 +281,12 @@ final class GuardMonitor: ObservableObject {
     }
 
     private func alarmMessage(from detail: String) -> String {
-        let websitePrefixes = ["Blocked website: ", "Website is outside your allow list: "]
+        let websitePrefixes = ["Website outside focus: "]
         for prefix in websitePrefixes where detail.hasPrefix(prefix) {
             return "You’re on \(detail.dropFirst(prefix.count))"
         }
 
-        let applicationPrefixes = ["Blocked application: ", "Application is outside your allow list: "]
+        let applicationPrefixes = ["Application outside focus list: "]
         for prefix in applicationPrefixes where detail.hasPrefix(prefix) {
             return "You’re using \(detail.dropFirst(prefix.count))"
         }

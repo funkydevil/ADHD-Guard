@@ -4,7 +4,6 @@ struct WebsiteRulesView: View {
     @EnvironmentObject private var store: ConfigurationStore
     @EnvironmentObject private var monitor: GuardMonitor
     @State private var newSite = ""
-    @State private var newPolicy: RulePolicy = .blocked
     @State private var validationMessage: String?
 
     var body: some View {
@@ -14,9 +13,8 @@ struct WebsiteRulesView: View {
                     ForEach(monitor.recentVisitedHosts, id: \.self) { host in
                         RecentHostRow(
                             host: host,
-                            matchingPolicy: matchingPolicy(for: host),
-                            isExactlyBlocked: isExactlyBlocked(host),
-                            onBlock: { block(host) }
+                            isOutsideFocus: isOutsideFocus(host),
+                            onAdd: { add(host) }
                         )
                     }
                 } header: {
@@ -31,13 +29,6 @@ struct WebsiteRulesView: View {
                     TextField("youtube.com or https://example.com/path", text: $newSite)
                         .textFieldStyle(.roundedBorder)
                         .onSubmit(addSite)
-
-                    Picker("Policy", selection: $newPolicy) {
-                        ForEach(RulePolicy.allCases) { policy in
-                            Text(policy.title).tag(policy)
-                        }
-                    }
-                    .frame(width: 142)
 
                     Button("Add", action: addSite)
                         .buttonStyle(.borderedProminent)
@@ -64,24 +55,16 @@ struct WebsiteRulesView: View {
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
                 } else {
-                    ForEach($store.configuration.websiteRules) { $rule in
+                    ForEach(store.configuration.websiteRules) { rule in
                         HStack(spacing: 12) {
-                            Image(systemName: rule.policy.symbol)
-                                .foregroundStyle(rule.policy == .allowed ? GuardPalette.focused : GuardPalette.alarm)
+                            Image(systemName: "globe.badge.chevron.backward")
+                                .foregroundStyle(GuardPalette.alarm)
                                 .frame(width: 24)
 
                             Text(rule.host)
                                 .font(.body.monospaced())
 
                             Spacer()
-
-                            Picker("Policy", selection: $rule.policy) {
-                                ForEach(RulePolicy.allCases) { policy in
-                                    Text(policy.title).tag(policy)
-                                }
-                            }
-                            .labelsHidden()
-                            .frame(width: 112)
 
                             Button(role: .destructive) {
                                 remove(rule.id)
@@ -95,32 +78,24 @@ struct WebsiteRulesView: View {
                     }
                 }
             } header: {
-                Text("Website rules")
+                Text("Outside focus")
             } footer: {
-                Text("Rules include subdomains. Blocked sites and sites outside a non-empty allow list use the focus buffer.")
+                Text("Every website in this list is outside focus. Matching subdomains use the distraction buffer.")
             }
         }
         .navigationTitle("Websites")
     }
 
-    private func matchingPolicy(for host: String) -> RulePolicy? {
-        RuleEvaluator.matchingWebsiteRule(host: host, rules: store.configuration.websiteRules)?.policy
+    private func isOutsideFocus(_ host: String) -> Bool {
+        RuleEvaluator.matchingWebsiteRule(host: host, rules: store.configuration.websiteRules) != nil
     }
 
-    private func isExactlyBlocked(_ host: String) -> Bool {
-        store.configuration.websiteRules.contains {
-            $0.policy == .blocked && $0.host.caseInsensitiveCompare(host) == .orderedSame
-        }
-    }
-
-    private func block(_ host: String) {
-        if let index = store.configuration.websiteRules.firstIndex(where: {
+    private func add(_ host: String) {
+        guard !store.configuration.websiteRules.contains(where: {
             $0.host.caseInsensitiveCompare(host) == .orderedSame
-        }) {
-            store.configuration.websiteRules[index].policy = .blocked
-        } else {
-            store.configuration.websiteRules.append(WebsiteRule(host: host, policy: .blocked))
-        }
+        }) else { return }
+
+        store.configuration.websiteRules.append(WebsiteRule(host: host))
     }
 
     private func addSite() {
@@ -129,13 +104,14 @@ struct WebsiteRulesView: View {
             return
         }
 
-        if let existingIndex = store.configuration.websiteRules.firstIndex(where: {
+        guard !store.configuration.websiteRules.contains(where: {
             $0.host.caseInsensitiveCompare(host) == .orderedSame
-        }) {
-            store.configuration.websiteRules[existingIndex].policy = newPolicy
-        } else {
-            store.configuration.websiteRules.append(WebsiteRule(host: host, policy: newPolicy))
+        }) else {
+            validationMessage = "This website is already in the list."
+            return
         }
+
+        store.configuration.websiteRules.append(WebsiteRule(host: host))
         newSite = ""
         validationMessage = nil
     }
@@ -147,9 +123,8 @@ struct WebsiteRulesView: View {
 
 private struct RecentHostRow: View {
     let host: String
-    let matchingPolicy: RulePolicy?
-    let isExactlyBlocked: Bool
-    let onBlock: () -> Void
+    let isOutsideFocus: Bool
+    let onAdd: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -160,19 +135,13 @@ private struct RecentHostRow: View {
                 .font(.body.monospaced())
             Spacer()
 
-            if isExactlyBlocked {
+            if isOutsideFocus {
                 StatusBadge(
-                    title: RulePolicy.blocked.title,
+                    title: "In list",
                     color: GuardPalette.alarm
                 )
             } else {
-                if let matchingPolicy {
-                    StatusBadge(
-                        title: matchingPolicy.title,
-                        color: matchingPolicy == .allowed ? GuardPalette.focused : GuardPalette.alarm
-                    )
-                }
-                Button("Block", action: onBlock)
+                Button("Add", action: onAdd)
                     .buttonStyle(.bordered)
                     .tint(GuardPalette.alarm)
             }

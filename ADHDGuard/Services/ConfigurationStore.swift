@@ -35,26 +35,21 @@ final class ConfigurationStore: ObservableObject {
             defaults.set(true, forKey: browserRulesMigrationKey)
         }
 
-        var updatedWebsiteRules = false
+        var addedDefaultWebsiteRules = false
         if !defaults.bool(forKey: defaultWebsiteRulesMigrationKey) {
             for defaultRule in GuardConfiguration.defaultWebsiteRules {
-                if let existingIndex = loadedConfiguration.websiteRules.firstIndex(where: {
+                if !loadedConfiguration.websiteRules.contains(where: {
                     $0.host.caseInsensitiveCompare(defaultRule.host) == .orderedSame
                 }) {
-                    if loadedConfiguration.websiteRules[existingIndex].policy != defaultRule.policy {
-                        loadedConfiguration.websiteRules[existingIndex].policy = defaultRule.policy
-                        updatedWebsiteRules = true
-                    }
-                } else {
                     loadedConfiguration.websiteRules.append(defaultRule)
-                    updatedWebsiteRules = true
+                    addedDefaultWebsiteRules = true
                 }
             }
             defaults.set(true, forKey: defaultWebsiteRulesMigrationKey)
         }
 
         configuration = loadedConfiguration
-        if addedBrowserRules || updatedWebsiteRules {
+        if addedBrowserRules || addedDefaultWebsiteRules {
             save()
         }
     }

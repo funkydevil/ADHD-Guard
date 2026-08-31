@@ -41,7 +41,7 @@ struct PreferencesView: View {
                     in: 0...600,
                     step: 5
                 )
-                Text("Website distractions use this timer. Explicitly blocked applications still alert immediately.")
+                Text("Websites in the outside-focus list and apps outside the focus-app list use this timer.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -83,7 +83,7 @@ struct PreferencesView: View {
                     )
                 }
 
-                Text("The chime repeats every 15 seconds. Voice repeats every 30 seconds until you return to an allowed context.")
+                Text("The chime repeats every 15 seconds. Voice repeats every 30 seconds until you return to a focus app or another focused context.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

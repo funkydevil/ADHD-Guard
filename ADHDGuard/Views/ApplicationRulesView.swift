@@ -15,7 +15,7 @@ struct ApplicationRulesView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Choose where focus belongs")
                         .font(.headline)
-                    Text("Blocked apps alert immediately. Unlisted apps use the focus buffer.")
+                    Text("Apps in this list are focus apps. Everything else uses the focus buffer.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -31,8 +31,8 @@ struct ApplicationRulesView: View {
                         ForEach(monitor.recentApplications) { application in
                             RecentApplicationRow(
                                 application: application,
-                                policy: applicationRule(for: application)?.policy,
-                                onAllow: { allow(application) }
+                                isIncluded: applicationRule(for: application) != nil,
+                                onAdd: { add(application) }
                             )
                         }
                     } header: {
@@ -52,11 +52,9 @@ struct ApplicationRulesView: View {
                         .frame(maxWidth: .infinity)
                         .listRowBackground(Color.clear)
                     } else {
-                        ForEach($store.configuration.applicationRules) { $rule in
+                        ForEach(store.configuration.applicationRules) { rule in
                             HStack(spacing: 12) {
-                                Image(systemName: rule.policy.symbol)
-                                    .foregroundStyle(rule.policy == .allowed ? GuardPalette.focused : GuardPalette.alarm)
-                                    .frame(width: 24)
+                                ApplicationIcon(bundleIdentifier: rule.bundleIdentifier)
 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(rule.name).font(.headline)
@@ -66,14 +64,6 @@ struct ApplicationRulesView: View {
                                 }
 
                                 Spacer()
-
-                                Picker("Policy", selection: $rule.policy) {
-                                    ForEach(RulePolicy.allCases) { policy in
-                                        Text(policy.title).tag(policy)
-                                    }
-                                }
-                                .labelsHidden()
-                                .frame(width: 110)
 
                                 Button(role: .destructive) {
                                     remove(rule.id)
@@ -87,9 +77,9 @@ struct ApplicationRulesView: View {
                         }
                     }
                 } header: {
-                    Text("Application rules")
+                    Text("Focus applications")
                 } footer: {
-                    Text("Return to an allowed app or website to silence an active focus alert.")
+                    Text("Return to an app in this list to silence an active focus alert.")
                 }
             }
         }
@@ -106,7 +96,7 @@ struct ApplicationRulesView: View {
     private func chooseApplication() {
         let panel = NSOpenPanel()
         panel.title = "Choose an application"
-        panel.prompt = "Add Rule"
+        panel.prompt = "Add Application"
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         panel.allowsMultipleSelection = false
@@ -128,7 +118,7 @@ struct ApplicationRulesView: View {
             ?? bundle.object(forInfoDictionaryKey: "CFBundleName") as? String
             ?? url.deletingPathExtension().lastPathComponent
         store.configuration.applicationRules.append(
-            ApplicationRule(name: name, bundleIdentifier: bundleIdentifier, policy: .allowed)
+            ApplicationRule(name: name, bundleIdentifier: bundleIdentifier)
         )
     }
 
@@ -142,18 +132,16 @@ struct ApplicationRulesView: View {
         }
     }
 
-    private func allow(_ application: RecentApplication) {
+    private func add(_ application: RecentApplication) {
         if let index = store.configuration.applicationRules.firstIndex(where: {
             $0.bundleIdentifier.caseInsensitiveCompare(application.bundleIdentifier) == .orderedSame
         }) {
             store.configuration.applicationRules[index].name = application.name
-            store.configuration.applicationRules[index].policy = .allowed
         } else {
             store.configuration.applicationRules.append(
                 ApplicationRule(
                     name: application.name,
-                    bundleIdentifier: application.bundleIdentifier,
-                    policy: .allowed
+                    bundleIdentifier: application.bundleIdentifier
                 )
             )
         }
@@ -162,8 +150,8 @@ struct ApplicationRulesView: View {
 
 private struct RecentApplicationRow: View {
     let application: RecentApplication
-    let policy: RulePolicy?
-    let onAllow: () -> Void
+    let isIncluded: Bool
+    let onAdd: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -179,15 +167,13 @@ private struct RecentApplicationRow: View {
 
             Spacer()
 
-            if let policy {
+            if isIncluded {
                 StatusBadge(
-                    title: policy.title,
-                    color: policy == .allowed ? GuardPalette.focused : GuardPalette.alarm
+                    title: "In list",
+                    color: GuardPalette.focused
                 )
-            }
-
-            if policy != .allowed {
-                Button("Allow", action: onAllow)
+            } else {
+                Button("Add", action: onAdd)
                     .buttonStyle(.bordered)
                     .tint(GuardPalette.focused)
             }

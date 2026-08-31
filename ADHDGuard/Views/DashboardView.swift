@@ -139,7 +139,7 @@ struct DashboardView: View {
     private var focusHeadline: String {
         guard store.configuration.monitoringEnabled else { return "Monitoring is paused" }
         switch monitor.lastDecision {
-        case .focused: return "You’re in an allowed context"
+        case .focused: return "You’re in a focused context"
         case .distracted: return monitor.distractionRemaining == 0 ? "The focus reminder is active" : "Your focus buffer is running"
         case nil: return "Waiting for activity"
         }

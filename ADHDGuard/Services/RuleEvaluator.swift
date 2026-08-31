@@ -13,33 +13,18 @@ enum RuleEvaluator {
 
         if context.isBrowser, let host = context.browserURL?.host?.lowercased() {
             if let rule = matchingWebsiteRule(host: host, rules: configuration.websiteRules) {
-                switch rule.policy {
-                case .blocked:
-                    return .distracted(detail: "Blocked website: \(rule.host)", immediate: false)
-                case .allowed:
-                    return .focused(detail: "Allowed website: \(rule.host)")
-                }
-            }
-
-            let allowedSites = configuration.websiteRules.filter { $0.policy == .allowed }
-            if !allowedSites.isEmpty {
-                return .distracted(detail: "Website is outside your allow list: \(host)", immediate: false)
+                return .distracted(detail: "Website outside focus: \(rule.host)", immediate: false)
             }
         }
 
         if let rule = configuration.applicationRules.first(where: {
             $0.bundleIdentifier.caseInsensitiveCompare(context.bundleIdentifier) == .orderedSame
         }) {
-            switch rule.policy {
-            case .allowed:
-                return .focused(detail: "Allowed application: \(rule.name)")
-            case .blocked:
-                return .distracted(detail: "Blocked application: \(rule.name)", immediate: true)
-            }
+            return .focused(detail: "Focus application: \(rule.name)")
         }
 
         return .distracted(
-            detail: "Application is outside your allow list: \(context.applicationName)",
+            detail: "Application outside focus list: \(context.applicationName)",
             immediate: false
         )
     }
@@ -75,8 +60,6 @@ enum RuleEvaluator {
     }
 
     static func matchingWebsiteRule(host: String, rules: [WebsiteRule]) -> WebsiteRule? {
-        // A blocked rule wins if a user accidentally adds the same host to both lists.
-        rules.first { $0.policy == .blocked && Self.host(host, matches: $0.host) }
-            ?? rules.first { $0.policy == .allowed && Self.host(host, matches: $0.host) }
+        rules.first { Self.host(host, matches: $0.host) }
     }
 }
