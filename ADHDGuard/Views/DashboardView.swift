@@ -455,12 +455,12 @@ private struct AuroraBackdrop: View {
         GeometryReader { proxy in
             ZStack {
                 cloudBlob(
-                    color: Color(red: 0.025, green: 0.033, blue: 0.075),
+                    color: Color(red: 0.045, green: 0.055, blue: 0.14),
                     width: proxy.size.width * 1.14,
                     height: proxy.size.height * 1.04,
                     x: 0,
                     y: 8,
-                    blur: reduceTransparency ? 52 : 76,
+                    blur: reduceTransparency ? 48 : 68,
                     opacity: 0.98
                 )
 
@@ -470,8 +470,8 @@ private struct AuroraBackdrop: View {
                     height: proxy.size.height * 0.62,
                     x: isDrifting ? -proxy.size.width * 0.16 : -proxy.size.width * 0.27,
                     y: -proxy.size.height * 0.18,
-                    blur: reduceTransparency ? 46 : 72,
-                    opacity: reduceTransparency ? 0.46 : 0.66
+                    blur: reduceTransparency ? 42 : 62,
+                    opacity: reduceTransparency ? 0.60 : 0.86
                 )
 
                 cloudBlob(
@@ -480,8 +480,8 @@ private struct AuroraBackdrop: View {
                     height: proxy.size.height * 0.72,
                     x: isDrifting ? proxy.size.width * 0.18 : proxy.size.width * 0.28,
                     y: proxy.size.height * 0.02,
-                    blur: reduceTransparency ? 52 : 82,
-                    opacity: reduceTransparency ? 0.40 : 0.58
+                    blur: reduceTransparency ? 46 : 68,
+                    opacity: reduceTransparency ? 0.54 : 0.78
                 )
 
                 cloudBlob(
@@ -490,8 +490,8 @@ private struct AuroraBackdrop: View {
                     height: proxy.size.height * 0.58,
                     x: isDrifting ? proxy.size.width * 0.05 : -proxy.size.width * 0.08,
                     y: proxy.size.height * 0.30,
-                    blur: reduceTransparency ? 48 : 78,
-                    opacity: reduceTransparency ? 0.34 : 0.52
+                    blur: reduceTransparency ? 44 : 66,
+                    opacity: reduceTransparency ? 0.48 : 0.72
                 )
 
                 cloudBlob(
@@ -500,8 +500,8 @@ private struct AuroraBackdrop: View {
                     height: proxy.size.height * 0.42,
                     x: isDrifting ? proxy.size.width * 0.30 : proxy.size.width * 0.15,
                     y: proxy.size.height * 0.30,
-                    blur: reduceTransparency ? 42 : 68,
-                    opacity: reduceTransparency ? 0.30 : 0.48
+                    blur: reduceTransparency ? 38 : 58,
+                    opacity: reduceTransparency ? 0.44 : 0.68
                 )
             }
             .compositingGroup()
@@ -529,7 +529,7 @@ private struct AuroraBackdrop: View {
         Ellipse()
             .fill(
                 RadialGradient(
-                    colors: [color, color.opacity(0.54), .clear],
+                    colors: [color, color.opacity(0.72), .clear],
                     center: .center,
                     startRadius: 0,
                     endRadius: max(width, height) * 0.48

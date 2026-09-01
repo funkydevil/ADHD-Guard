@@ -1,3 +1,4 @@
+import AppKit
 import ServiceManagement
 import XCTest
 @testable import ADHDGuard
@@ -458,6 +459,20 @@ final class GuardSessionStateTests: XCTestCase {
                 to: CGPoint(x: 101, y: 100)
             )
         )
+    }
+
+    func testMenuBarStatusIconProducesTemplateImage() throws {
+        let image = MenuBarStatusIcon.templateImage(for: .paused)
+        let tiffData = try XCTUnwrap(image.tiffRepresentation)
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: tiffData))
+        let hasVisiblePixel = (0..<bitmap.pixelsHigh).contains { y in
+            (0..<bitmap.pixelsWide).contains { x in
+                (bitmap.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0
+            }
+        }
+
+        XCTAssertTrue(image.isTemplate)
+        XCTAssertTrue(hasVisiblePixel)
     }
 
     private func contextForHistory(name: String, bundle: String) -> ActivityContext {

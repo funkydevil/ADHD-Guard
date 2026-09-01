@@ -368,15 +368,107 @@ struct MenuBarStatusIcon: View {
     let presentation: GuardStatusPresentation
 
     var body: some View {
-        GuardMark(
-            presentation: presentation,
-            size: 17,
-            gateColor: .primary,
-            coreColor: .primary
-        )
+        Image(nsImage: Self.templateImage(for: presentation.kind))
+            .renderingMode(.template)
             .frame(width: 18, height: 18)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("ADHD Guard, \(presentation.accessibilityTitle)")
+    }
+
+    static func templateImage(for kind: GuardVisualKind) -> NSImage {
+        let imageSize = NSSize(width: 18, height: 18)
+        let image = NSImage(size: imageSize, flipped: true) { rect in
+            drawGate(in: rect)
+            drawCore(for: kind, in: rect)
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }
+
+    private static func drawGate(in rect: NSRect) {
+        let width = rect.width
+        let height = rect.height
+        let path = NSBezierPath()
+
+        path.move(to: NSPoint(x: rect.minX + width * 0.38, y: rect.minY + height * 0.12))
+        path.curve(
+            to: NSPoint(x: rect.minX + width * 0.14, y: rect.minY + height * 0.37),
+            controlPoint1: NSPoint(x: rect.minX + width * 0.24, y: rect.minY + height * 0.13),
+            controlPoint2: NSPoint(x: rect.minX + width * 0.15, y: rect.minY + height * 0.23)
+        )
+        path.line(to: NSPoint(x: rect.minX + width * 0.14, y: rect.minY + height * 0.63))
+        path.curve(
+            to: NSPoint(x: rect.minX + width * 0.38, y: rect.minY + height * 0.88),
+            controlPoint1: NSPoint(x: rect.minX + width * 0.15, y: rect.minY + height * 0.77),
+            controlPoint2: NSPoint(x: rect.minX + width * 0.24, y: rect.minY + height * 0.87)
+        )
+
+        path.move(to: NSPoint(x: rect.minX + width * 0.62, y: rect.minY + height * 0.12))
+        path.curve(
+            to: NSPoint(x: rect.minX + width * 0.86, y: rect.minY + height * 0.37),
+            controlPoint1: NSPoint(x: rect.minX + width * 0.76, y: rect.minY + height * 0.13),
+            controlPoint2: NSPoint(x: rect.minX + width * 0.85, y: rect.minY + height * 0.23)
+        )
+        path.line(to: NSPoint(x: rect.minX + width * 0.86, y: rect.minY + height * 0.63))
+        path.curve(
+            to: NSPoint(x: rect.minX + width * 0.62, y: rect.minY + height * 0.88),
+            controlPoint1: NSPoint(x: rect.minX + width * 0.85, y: rect.minY + height * 0.77),
+            controlPoint2: NSPoint(x: rect.minX + width * 0.76, y: rect.minY + height * 0.87)
+        )
+
+        path.lineWidth = 1.55
+        path.lineCapStyle = .round
+        path.lineJoinStyle = .round
+        NSColor.black.setStroke()
+        path.stroke()
+    }
+
+    private static func drawCore(for kind: GuardVisualKind, in rect: NSRect) {
+        let center = NSPoint(x: rect.midX, y: rect.midY)
+        let coreRect = NSRect(x: center.x - 2.1, y: center.y - 2.1, width: 4.2, height: 4.2)
+        NSColor.black.setFill()
+        NSColor.black.setStroke()
+
+        switch kind {
+        case .focused:
+            NSBezierPath(ovalIn: coreRect).fill()
+        case .starting:
+            let path = NSBezierPath(ovalIn: coreRect)
+            path.lineWidth = 1.2
+            path.stroke()
+        case .grace:
+            let path = NSBezierPath()
+            path.appendArc(
+                withCenter: center,
+                radius: 2.2,
+                startAngle: 50,
+                endAngle: 330,
+                clockwise: false
+            )
+            path.lineWidth = 1.25
+            path.lineCapStyle = .round
+            path.stroke()
+        case .alarm:
+            let path = NSBezierPath()
+            path.move(to: NSPoint(x: center.x, y: center.y - 2.4))
+            path.line(to: NSPoint(x: center.x + 2.4, y: center.y))
+            path.line(to: NSPoint(x: center.x, y: center.y + 2.4))
+            path.line(to: NSPoint(x: center.x - 2.4, y: center.y))
+            path.close()
+            path.fill()
+        case .paused:
+            NSBezierPath(
+                roundedRect: NSRect(x: center.x - 2.2, y: center.y - 2.2, width: 1.45, height: 4.4),
+                xRadius: 0.7,
+                yRadius: 0.7
+            ).fill()
+            NSBezierPath(
+                roundedRect: NSRect(x: center.x + 0.75, y: center.y - 2.2, width: 1.45, height: 4.4),
+                xRadius: 0.7,
+                yRadius: 0.7
+            ).fill()
+        }
     }
 }
 
