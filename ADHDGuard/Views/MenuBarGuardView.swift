@@ -108,11 +108,6 @@ struct MenuBarGuardView: View {
                 Button("Open ADHD Guard", action: { open(.status) })
                 Button("Settings…", action: { open(.settings) })
                 Divider()
-                Button(store.configuration.monitoringEnabled ? "Pause reminders" : "Start Guard") {
-                    store.configuration.monitoringEnabled.toggle()
-                }
-                .disabled(isDistractionAlertActive)
-                Divider()
                 Button("Quit ADHD Guard") {
                     NSApp.terminate(nil)
                 }
@@ -129,12 +124,6 @@ struct MenuBarGuardView: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
-            Toggle("Focus reminders", isOn: $store.configuration.monitoringEnabled)
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .font(.caption.weight(.semibold))
-                .disabled(isDistractionAlertActive)
-
             Spacer(minLength: 4)
 
             Button("Open app") {
@@ -159,7 +148,16 @@ struct MenuBarGuardView: View {
 
     private var statusPage: some View {
         VStack(spacing: 10) {
-            CompactGuardStatus(presentation: presentation)
+            Button(action: toggleGuard) {
+                CompactGuardStatus(presentation: presentation)
+                    .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(isDistractionAlertActive)
+            .help(guardToggleHelp)
+            .accessibilityLabel("Guard mode")
+            .accessibilityValue(store.configuration.monitoringEnabled ? "On" : "Paused")
+            .accessibilityHint(guardToggleHelp)
 
             VStack(alignment: .leading, spacing: 9) {
                 HStack(spacing: 10) {
@@ -298,6 +296,15 @@ struct MenuBarGuardView: View {
         alarm.activeAlarm?.kind == .distraction
     }
 
+    private var guardToggleHelp: String {
+        if isDistractionAlertActive {
+            return "Return to a focus activity before pausing Guard."
+        }
+        return store.configuration.monitoringEnabled
+            ? "Pause focus reminders."
+            : "Start Guard."
+    }
+
     private var contextClassification: String {
         guard let context = displayContext else { return "Waiting" }
         if let host = context.browserURL?.host, store.containsDistractingSite(host) {
@@ -344,6 +351,11 @@ struct MenuBarGuardView: View {
         withAnimation(reduceMotion ? .easeOut(duration: 0.11) : .easeOut(duration: 0.16)) {
             page = newPage
         }
+    }
+
+    private func toggleGuard() {
+        guard !isDistractionAlertActive else { return }
+        store.configuration.monitoringEnabled.toggle()
     }
 
     private func performContextAction() {
