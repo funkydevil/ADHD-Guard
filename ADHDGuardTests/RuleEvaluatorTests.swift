@@ -349,13 +349,13 @@ final class GuardSessionStateTests: XCTestCase {
         XCTAssertTrue(
             AlarmPointerInteraction.isClick(
                 from: CGPoint(x: 100, y: 100),
-                to: CGPoint(x: 101, y: 100)
+                to: CGPoint(x: 100.5, y: 100)
             )
         )
         XCTAssertFalse(
             AlarmPointerInteraction.isClick(
                 from: CGPoint(x: 100, y: 100),
-                to: CGPoint(x: 103, y: 100)
+                to: CGPoint(x: 101, y: 100)
             )
         )
     }

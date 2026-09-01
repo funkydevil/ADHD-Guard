@@ -164,8 +164,8 @@ struct DashboardView: View {
             )
         }
 
-        activities = Array(activities.prefix(3))
-        while activities.count < 3 {
+        activities = Array(activities.prefix(4))
+        while activities.count < 4 {
             let slot = activities.count
             activities.append(
                 DashboardActivity(
@@ -341,7 +341,7 @@ private struct AuroraActivityScene: View {
             .padding(.bottom, 20)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 312)
+        .frame(height: 386)
         .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
         .animation(
             reduceMotion ? nil : .easeInOut(duration: 0.24),
@@ -508,6 +508,8 @@ private struct AuroraBackdrop: View {
 }
 
 private struct PerspectiveActivityStack: View {
+    @State private var hoveredActivityID: DashboardActivity.ID?
+
     let activities: [DashboardActivity]
     let actionTitle: String?
     let actionColor: Color
@@ -518,40 +520,58 @@ private struct PerspectiveActivityStack: View {
         VStack(spacing: 7) {
             ForEach(activities) { activity in
                 let depth = activities.firstIndex(where: { $0.id == activity.id }) ?? 0
+                let isHovering = hoveredActivityID == activity.id
                 PerspectiveActivityRow(
                     activity: activity,
                     depth: depth,
+                    isHovering: isHovering,
                     actionTitle: activity.isCurrent ? actionTitle : nil,
                     actionColor: actionColor,
                     action: action,
-                    openActivity: { openActivity(activity) }
+                    openActivity: { openActivity(activity) },
+                    onHover: { hovering in
+                        if hovering, !activity.isPlaceholder {
+                            hoveredActivityID = activity.id
+                        } else if hoveredActivityID == activity.id {
+                            hoveredActivityID = nil
+                        }
+                    }
                 )
-                .scaleEffect(1 - CGFloat(depth) * 0.045)
+                .scaleEffect(isHovering ? 1.015 : 1 - CGFloat(depth) * 0.045)
                 .rotation3DEffect(
-                    .degrees(Double(depth) * -1.6),
+                    .degrees(isHovering ? 0 : Double(depth) * -1.6),
                     axis: (x: 1, y: 0, z: 0),
                     anchor: .center,
                     perspective: 0.42
                 )
-                .opacity(1 - Double(depth) * 0.18)
+                .opacity(isHovering ? 1 : 1 - Double(depth) * 0.18)
+                .offset(y: isHovering ? -4 : 0)
+                .shadow(
+                    color: .black.opacity(isHovering ? 0.34 : 0),
+                    radius: isHovering ? 18 : 0,
+                    y: isHovering ? 10 : 0
+                )
+                .zIndex(isHovering ? 100 : Double(activities.count - depth))
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 205, alignment: .top)
+        .frame(height: 274, alignment: .top)
+        .animation(.easeOut(duration: 0.18), value: hoveredActivityID)
     }
 }
 
 private struct PerspectiveActivityRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isFloating = false
-    @State private var isHovering = false
 
     let activity: DashboardActivity
     let depth: Int
+    let isHovering: Bool
     let actionTitle: String?
     let actionColor: Color
     let action: () -> Void
     let openActivity: () -> Void
+    let onHover: (Bool) -> Void
 
     var body: some View {
         HStack(spacing: 13) {
@@ -611,8 +631,8 @@ private struct PerspectiveActivityRow: View {
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
         .opacity(activity.isPlaceholder ? 0.72 : 1)
         .offset(
-            x: reduceMotion ? 0 : (isFloating ? floatingX : -floatingX),
-            y: reduceMotion ? 0 : (isFloating ? -1.4 : 1.4)
+            x: reduceMotion || isHovering ? 0 : (isFloating ? floatingX : -floatingX),
+            y: reduceMotion || isHovering ? 0 : (isFloating ? -1.4 : 1.4)
         )
         .animation(
             reduceMotion
@@ -623,7 +643,7 @@ private struct PerspectiveActivityRow: View {
         .animation(.easeOut(duration: 0.16), value: isHovering)
         .onAppear { updateFloatingState() }
         .onChange(of: reduceMotion) { _ in updateFloatingState() }
-        .onHover { isHovering = $0 && !activity.isPlaceholder }
+        .onHover(perform: onHover)
         .accessibilityElement(children: .contain)
     }
 

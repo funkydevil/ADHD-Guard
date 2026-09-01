@@ -324,12 +324,12 @@ private final class DraggableHostingView<Content: View>: NSHostingView<Content> 
 
     override func mouseDown(with event: NSEvent) {
         guard let window else { return }
-        let originalOrigin = window.frame.origin
+        let originalPointerLocation = NSEvent.mouseLocation
         window.performDrag(with: event)
 
         if AlarmPointerInteraction.isClick(
-            from: originalOrigin,
-            to: window.frame.origin
+            from: originalPointerLocation,
+            to: NSEvent.mouseLocation
         ) {
             onClick()
         }
@@ -337,10 +337,12 @@ private final class DraggableHostingView<Content: View>: NSHostingView<Content> 
 }
 
 enum AlarmPointerInteraction {
+    private static let maximumClickTravel: CGFloat = 0.75
+
     static func isClick(from originalOrigin: NSPoint, to currentOrigin: NSPoint) -> Bool {
         hypot(
             currentOrigin.x - originalOrigin.x,
             currentOrigin.y - originalOrigin.y
-        ) < 2
+        ) < maximumClickTravel
     }
 }
