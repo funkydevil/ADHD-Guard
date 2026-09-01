@@ -48,9 +48,9 @@ struct GuardStatusPresentation: Equatable {
         switch state {
         case .paused:
             [
-                Color(red: 0.38, green: 0.40, blue: 0.46),
-                Color(red: 0.27, green: 0.29, blue: 0.34),
-                Color(red: 0.35, green: 0.32, blue: 0.41)
+                Color(red: 0.32, green: 0.35, blue: 0.56),
+                Color(red: 0.20, green: 0.43, blue: 0.46),
+                Color(red: 0.42, green: 0.30, blue: 0.54)
             ]
         case .starting:
             [
@@ -290,148 +290,6 @@ struct GuardMark: View {
     }
 }
 
-struct RefractedStatusLens: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @State private var sweepPosition: CGFloat = -0.28
-    @State private var glowBoost = 0.0
-    @State private var motionTask: Task<Void, Never>?
-
-    let presentation: GuardStatusPresentation
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 38, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: presentation.gradientColors,
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-
-            RoundedRectangle(cornerRadius: 38, style: .continuous)
-                .fill(
-                    RadialGradient(
-                        colors: [.white.opacity(reduceTransparency ? 0.12 : 0.24), .clear],
-                        center: .topLeading,
-                        startRadius: 0,
-                        endRadius: 270
-                    )
-                )
-
-            RoundedRectangle(cornerRadius: 38, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [.clear, .black.opacity(0.16)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-
-            GeometryReader { proxy in
-                LinearGradient(
-                    colors: [.clear, .white.opacity(0.16), .clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(width: 92, height: proxy.size.height * 1.65)
-                .rotationEffect(.degrees(18))
-                .offset(
-                    x: sweepPosition * (proxy.size.width + 110),
-                    y: -proxy.size.height * 0.30
-                )
-                .blendMode(.screen)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 38, style: .continuous))
-
-            RoundedRectangle(cornerRadius: 38, style: .continuous)
-                .stroke(.white.opacity(0.2), lineWidth: 1)
-
-            HStack(spacing: 17) {
-                GuardMark(
-                    presentation: presentation,
-                    size: 44,
-                    gateColor: .white.opacity(0.86),
-                    coreColor: .white
-                )
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(presentation.title)
-                        .font(.system(size: 23, weight: .semibold, design: .rounded))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-                    Text(presentation.detail)
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.78))
-                        .lineLimit(2)
-                }
-
-                Spacer(minLength: 8)
-
-                if let shortValue = presentation.shortValue {
-                    Text(shortValue)
-                        .font(.system(size: 29, weight: .bold, design: .rounded).monospacedDigit())
-                        .transition(.opacity)
-                }
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 28)
-            .padding(.vertical, 24)
-
-            if case .grace = presentation.state {
-                GeometryReader { proxy in
-                    Capsule()
-                        .fill(.white.opacity(0.75))
-                        .frame(width: max(22, (proxy.size.width - 68) * presentation.progress), height: 3)
-                        .position(x: 34 + max(22, (proxy.size.width - 68) * presentation.progress) / 2, y: proxy.size.height - 22)
-                }
-            }
-        }
-        .frame(maxWidth: 500)
-        .frame(height: 148)
-        .shadow(
-            color: presentation.color.opacity(0.15 + glowBoost),
-            radius: 18 + glowBoost * 30,
-            y: 8
-        )
-        .animation(
-            reduceMotion ? .easeOut(duration: 0.12) : .timingCurve(0.22, 1, 0.36, 1, duration: 0.26),
-            value: presentation.kind
-        )
-        .animation(.easeOut(duration: reduceMotion ? 0 : 0.18), value: presentation.progress)
-        .onAppear { runStatusTransition() }
-        .onChange(of: presentation.kind) { _ in runStatusTransition() }
-        .onDisappear { motionTask?.cancel() }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Guard status: \(presentation.accessibilityTitle). \(presentation.detail)")
-    }
-
-    private func runStatusTransition() {
-        motionTask?.cancel()
-        sweepPosition = -0.28
-        glowBoost = 0
-
-        guard !reduceMotion else { return }
-
-        motionTask = Task { @MainActor in
-            withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.62)) {
-                sweepPosition = 0.94
-            }
-            withAnimation(.easeOut(duration: 0.20)) {
-                glowBoost = presentation.kind == .alarm ? 0.16 : 0.08
-            }
-
-            try? await Task.sleep(nanoseconds: 230_000_000)
-            guard !Task.isCancelled else { return }
-
-            withAnimation(.easeOut(duration: 0.24)) {
-                glowBoost = 0
-            }
-        }
-    }
-}
-
 struct CompactGuardStatus: View {
     let presentation: GuardStatusPresentation
 
@@ -484,14 +342,27 @@ struct MenuBarStatusIcon: View {
     let presentation: GuardStatusPresentation
 
     var body: some View {
-        GuardMark(
-            presentation: presentation,
-            size: 18,
-            gateColor: .primary,
-            coreColor: presentation.color
-        )
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("ADHD Guard, \(presentation.accessibilityTitle)")
+        Image(systemName: symbol)
+            .font(.system(size: 15, weight: .semibold))
+            .symbolRenderingMode(.monochrome)
+            .frame(width: 18, height: 18)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("ADHD Guard, \(presentation.accessibilityTitle)")
+    }
+
+    private var symbol: String {
+        switch presentation.kind {
+        case .paused:
+            "pause.circle"
+        case .starting:
+            "ellipsis.circle"
+        case .focused:
+            "scope"
+        case .grace:
+            "timer"
+        case .alarm:
+            "exclamationmark.triangle.fill"
+        }
     }
 }
 
