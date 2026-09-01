@@ -44,7 +44,7 @@ struct WebsiteRulesView: View {
                 }
             }
 
-            Text("This session only · browsing history is not saved")
+            Text("Recent sites are saved locally on this Mac")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
 

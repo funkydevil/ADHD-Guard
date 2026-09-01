@@ -228,7 +228,7 @@ struct PreferencesView: View {
                             .font(.subheadline.weight(.semibold))
                         StatusBadge(title: "Local only", color: GuardPalette.focused)
                     }
-                    Text("Only the active tab is checked against your rules. Browsing history is never stored.")
+                    Text("Only the active tab is checked against your rules. A short list of recent apps and sites is stored locally and never leaves this Mac.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

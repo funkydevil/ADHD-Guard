@@ -36,6 +36,13 @@ enum RuleCollection: String, CaseIterable, Identifiable {
         case .distractingSites: "Distracting sites"
         }
     }
+
+    var subtitle: String {
+        switch self {
+        case .focusApps: "Apps that keep you in flow."
+        case .distractingSites: "Sites that start your focus timer."
+        }
+    }
 }
 
 @MainActor
@@ -239,9 +246,9 @@ private struct RulesView: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("Your lists")
+                    Text(navigation.ruleCollection.title)
                         .font(.system(size: 30, weight: .semibold, design: .rounded))
-                    Text("Choose where focus belongs — and what pulls you away.")
+                    Text(navigation.ruleCollection.subtitle)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }

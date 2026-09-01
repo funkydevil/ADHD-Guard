@@ -551,7 +551,7 @@ private struct MenuListPage: View {
                     }
                 }
 
-                Text("This session only · history is not saved")
+                Text("Saved locally on this Mac")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
 

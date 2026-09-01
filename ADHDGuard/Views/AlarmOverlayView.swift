@@ -6,8 +6,13 @@ struct AlarmOverlayView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: alarm.kind == .idle ? "figure.walk.motion" : "scope")
-                .font(.system(size: 21, weight: .semibold))
+            GuardMark(
+                kind: alarm.kind == .idle ? .grace : .alarm,
+                color: .white,
+                size: 25,
+                gateColor: .white.opacity(0.92),
+                coreColor: .white
+            )
                 .frame(width: 34, height: 34)
                 .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
 

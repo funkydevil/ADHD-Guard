@@ -377,7 +377,6 @@ private struct AuroraActivityScene: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 386)
-        .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
         .animation(
             reduceMotion ? nil : .easeInOut(duration: 0.24),
             value: activities.map(\.id)
@@ -455,52 +454,57 @@ private struct AuroraBackdrop: View {
     var body: some View {
         GeometryReader { proxy in
             ZStack {
-                Color(red: 0.035, green: 0.045, blue: 0.08)
-
-                LinearGradient(
-                    colors: presentation.gradientColors.map { $0.opacity(reduceTransparency ? 0.72 : 0.34) },
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+                cloudBlob(
+                    color: Color(red: 0.025, green: 0.033, blue: 0.075),
+                    width: proxy.size.width * 1.14,
+                    height: proxy.size.height * 1.04,
+                    x: 0,
+                    y: 8,
+                    blur: reduceTransparency ? 52 : 76,
+                    opacity: 0.98
                 )
 
-                if !reduceTransparency {
-                    ribbon(
-                        colors: [presentation.gradientColors[0], presentation.gradientColors[1], .clear],
-                        width: proxy.size.width * 0.98,
-                        height: 104,
-                        rotation: -10,
-                        x: isDrifting ? proxy.size.width * 0.10 : -proxy.size.width * 0.12,
-                        y: -proxy.size.height * 0.20,
-                        opacity: 0.78
-                    )
+                cloudBlob(
+                    color: presentation.gradientColors[0],
+                    width: proxy.size.width * 0.72,
+                    height: proxy.size.height * 0.62,
+                    x: isDrifting ? -proxy.size.width * 0.16 : -proxy.size.width * 0.27,
+                    y: -proxy.size.height * 0.18,
+                    blur: reduceTransparency ? 46 : 72,
+                    opacity: reduceTransparency ? 0.46 : 0.66
+                )
 
-                    ribbon(
-                        colors: [.clear, presentation.gradientColors[2], presentation.gradientColors[0]],
-                        width: proxy.size.width * 1.08,
-                        height: 126,
-                        rotation: 12,
-                        x: isDrifting ? -proxy.size.width * 0.11 : proxy.size.width * 0.08,
-                        y: proxy.size.height * 0.08,
-                        opacity: 0.60
-                    )
+                cloudBlob(
+                    color: presentation.gradientColors[1],
+                    width: proxy.size.width * 0.80,
+                    height: proxy.size.height * 0.72,
+                    x: isDrifting ? proxy.size.width * 0.18 : proxy.size.width * 0.28,
+                    y: proxy.size.height * 0.02,
+                    blur: reduceTransparency ? 52 : 82,
+                    opacity: reduceTransparency ? 0.40 : 0.58
+                )
 
-                    Circle()
-                        .fill(presentation.color.opacity(0.48))
-                        .frame(width: proxy.size.width * 0.42)
-                        .blur(radius: 58)
-                        .offset(
-                            x: isDrifting ? proxy.size.width * 0.28 : proxy.size.width * 0.12,
-                            y: proxy.size.height * 0.22
-                        )
-                        .blendMode(.screen)
-                }
+                cloudBlob(
+                    color: presentation.gradientColors[2],
+                    width: proxy.size.width * 0.68,
+                    height: proxy.size.height * 0.58,
+                    x: isDrifting ? proxy.size.width * 0.05 : -proxy.size.width * 0.08,
+                    y: proxy.size.height * 0.30,
+                    blur: reduceTransparency ? 48 : 78,
+                    opacity: reduceTransparency ? 0.34 : 0.52
+                )
 
-                LinearGradient(
-                    colors: [.clear, .black.opacity(0.12), .black.opacity(0.48)],
-                    startPoint: .top,
-                    endPoint: .bottom
+                cloudBlob(
+                    color: presentation.color,
+                    width: proxy.size.width * 0.44,
+                    height: proxy.size.height * 0.42,
+                    x: isDrifting ? proxy.size.width * 0.30 : proxy.size.width * 0.15,
+                    y: proxy.size.height * 0.30,
+                    blur: reduceTransparency ? 42 : 68,
+                    opacity: reduceTransparency ? 0.30 : 0.48
                 )
             }
+            .compositingGroup()
         }
         .animation(
             reduceMotion ? nil : .easeInOut(duration: 16).repeatForever(autoreverses: true),
@@ -509,29 +513,30 @@ private struct AuroraBackdrop: View {
         .animation(.easeInOut(duration: reduceMotion ? 0 : 0.35), value: presentation.kind)
         .onAppear { updateMotion() }
         .onChange(of: reduceMotion) { _ in updateMotion() }
+        .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 
-    private func ribbon(
-        colors: [Color],
+    private func cloudBlob(
+        color: Color,
         width: CGFloat,
         height: CGFloat,
-        rotation: Double,
         x: CGFloat,
         y: CGFloat,
+        blur: CGFloat,
         opacity: Double
     ) -> some View {
-        Capsule()
+        Ellipse()
             .fill(
-                LinearGradient(
-                    colors: colors,
-                    startPoint: .leading,
-                    endPoint: .trailing
+                RadialGradient(
+                    colors: [color, color.opacity(0.54), .clear],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: max(width, height) * 0.48
                 )
             )
             .frame(width: width, height: height)
-            .rotationEffect(.degrees(rotation))
-            .blur(radius: 32)
+            .blur(radius: blur)
             .opacity(opacity)
             .offset(x: x, y: y)
             .blendMode(.screen)

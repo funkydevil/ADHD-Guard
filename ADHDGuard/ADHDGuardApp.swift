@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 @main
@@ -10,6 +11,8 @@ struct ADHDGuardApp: App {
     @StateObject private var launchAtLogin: LaunchAtLoginController
 
     init() {
+        NSApplication.shared.appearance = NSAppearance(named: .darkAqua)
+
         let store = ConfigurationStore()
         let alarm = AlarmController()
         _store = StateObject(wrappedValue: store)
@@ -27,6 +30,7 @@ struct ADHDGuardApp: App {
                 .environmentObject(monitor)
                 .environmentObject(navigation)
                 .environmentObject(launchAtLogin)
+                .preferredColorScheme(.dark)
                 .onAppear { monitor.start() }
         }
         .defaultSize(width: 980, height: 680)
@@ -59,6 +63,7 @@ struct ADHDGuardApp: App {
                 .environmentObject(monitor)
                 .environmentObject(alarm)
                 .environmentObject(navigation)
+                .preferredColorScheme(.dark)
         } label: {
             MenuBarStatusIcon(presentation: menuBarPresentation)
         }
@@ -71,6 +76,7 @@ struct ADHDGuardApp: App {
                 .environmentObject(monitor)
                 .environmentObject(launchAtLogin)
                 .frame(width: 560, height: 540)
+                .preferredColorScheme(.dark)
         }
     }
 

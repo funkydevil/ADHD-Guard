@@ -16,19 +16,41 @@ final class GuardMonitor: ObservableObject {
 
     private let store: ConfigurationStore
     private let alarm: AlarmController
+    private let recentActivityPersistence: RecentActivityPersistence
     private var loopTask: Task<Void, Never>?
     private var distractionEpisode = DistractionEpisode()
-    private var recentHostHistory = RecentHostHistory()
-    private var recentApplicationHistory = RecentApplicationHistory()
-    private var recentActivityHistory = RecentActivityHistory()
+    private var recentHostHistory: RecentHostHistory
+    private var recentApplicationHistory: RecentApplicationHistory
+    private var recentActivityHistory: RecentActivityHistory
     private var focusReturnHistory = FocusReturnHistory()
+    private var workspaceLifecycleCancellables = Set<AnyCancellable>()
+    private var isComputerSleeping = false
     private var lastBrowserReadAt = Date.distantPast
     private var cachedBrowserURL: URL?
     private var cachedBrowserBundleIdentifier: String?
 
-    init(store: ConfigurationStore, alarm: AlarmController) {
+    init(
+        store: ConfigurationStore,
+        alarm: AlarmController,
+        defaults: UserDefaults = .standard
+    ) {
         self.store = store
         self.alarm = alarm
+        let persistence = RecentActivityPersistence(defaults: defaults)
+        recentActivityPersistence = persistence
+
+        let snapshot = persistence.load()
+        let hostHistory = RecentHostHistory(hosts: snapshot.hosts)
+        let applicationHistory = RecentApplicationHistory(applications: snapshot.applications)
+        let activityHistory = RecentActivityHistory(activities: snapshot.activities)
+        recentHostHistory = hostHistory
+        recentApplicationHistory = applicationHistory
+        recentActivityHistory = activityHistory
+        recentVisitedHosts = hostHistory.hosts
+        recentApplications = applicationHistory.applications
+        recentActivities = activityHistory.activities
+
+        subscribeToWorkspaceLifecycle()
     }
 
     deinit {
@@ -54,9 +76,11 @@ final class GuardMonitor: ObservableObject {
     }
 
     func checkNow() {
+        guard !isComputerSleeping else { return }
+
         let configuration = store.configuration
 
-        // Keep the current context and session-only recents useful while
+        // Keep the current context and locally persisted recents useful while
         // reminders are paused. Enforcement still exits below.
         guard let application = NSWorkspace.shared.frontmostApplication else {
             statusText = configuration.monitoringEnabled
@@ -79,13 +103,7 @@ final class GuardMonitor: ObservableObject {
             idleSeconds: IdleTimeProvider.currentIdleSeconds()
         )
         currentContext = context
-        recordRecentApplicationIfNeeded(
-            context: context,
-            isOwnApplication: isOwnApplication,
-            isUserVisibleApplication: application.activationPolicy == .regular
-        )
-        recordRecentHostIfNeeded(context: context)
-        recordRecentActivityIfNeeded(
+        recordRecentHistoryIfNeeded(
             context: context,
             isOwnApplication: isOwnApplication,
             isUserVisibleApplication: application.activationPolicy == .regular
@@ -204,6 +222,36 @@ final class GuardMonitor: ObservableObject {
         distractionRemaining = nil
     }
 
+    private func subscribeToWorkspaceLifecycle() {
+        let notificationCenter = NSWorkspace.shared.notificationCenter
+        notificationCenter.publisher(for: NSWorkspace.willSleepNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.handleSystemWillSleep(at: Date())
+            }
+            .store(in: &workspaceLifecycleCancellables)
+
+        notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.handleSystemDidWake(at: Date())
+            }
+            .store(in: &workspaceLifecycleCancellables)
+    }
+
+    private func handleSystemWillSleep(at date: Date) {
+        guard !isComputerSleeping else { return }
+        isComputerSleeping = true
+        distractionEpisode.pause(at: date)
+    }
+
+    private func handleSystemDidWake(at date: Date) {
+        guard isComputerSleeping else { return }
+        distractionEpisode.resume(at: date)
+        isComputerSleeping = false
+        checkNow()
+    }
+
     private func returnToLastFocusedContext() {
         guard let target = focusReturnHistory.target else { return }
 
@@ -274,40 +322,43 @@ final class GuardMonitor: ObservableObject {
         workspace.openApplication(at: applicationURL, configuration: configuration)
     }
 
-    private func recordRecentHostIfNeeded(context: ActivityContext) {
-        guard context.isBrowser,
-              let host = context.browserURL?.host else { return }
+    private func recordRecentHistoryIfNeeded(
+        context: ActivityContext,
+        isOwnApplication: Bool,
+        isUserVisibleApplication: Bool
+    ) {
+        let previousSnapshot = recentActivitySnapshot
 
-        recentHostHistory.record(host)
+        if context.isBrowser, let host = context.browserURL?.host {
+            recentHostHistory.record(host)
+        }
+
+        if isUserVisibleApplication,
+           !isOwnApplication,
+           !context.bundleIdentifier.hasPrefix("unknown.") {
+            recentApplicationHistory.record(
+                name: context.applicationName,
+                bundleIdentifier: context.bundleIdentifier
+            )
+            recentActivityHistory.record(context: context)
+        }
+
         recentVisitedHosts = recentHostHistory.hosts
-    }
-
-    private func recordRecentApplicationIfNeeded(
-        context: ActivityContext,
-        isOwnApplication: Bool,
-        isUserVisibleApplication: Bool
-    ) {
-        guard isUserVisibleApplication,
-              !isOwnApplication,
-              !context.bundleIdentifier.hasPrefix("unknown.") else { return }
-        recentApplicationHistory.record(
-            name: context.applicationName,
-            bundleIdentifier: context.bundleIdentifier
-        )
         recentApplications = recentApplicationHistory.applications
+        recentActivities = recentActivityHistory.activities
+
+        let updatedSnapshot = recentActivitySnapshot
+        if updatedSnapshot != previousSnapshot {
+            recentActivityPersistence.save(updatedSnapshot)
+        }
     }
 
-    private func recordRecentActivityIfNeeded(
-        context: ActivityContext,
-        isOwnApplication: Bool,
-        isUserVisibleApplication: Bool
-    ) {
-        guard isUserVisibleApplication,
-              !isOwnApplication,
-              !context.bundleIdentifier.hasPrefix("unknown.") else { return }
-
-        recentActivityHistory.record(context: context)
-        recentActivities = recentActivityHistory.activities
+    private var recentActivitySnapshot: RecentActivitySnapshot {
+        RecentActivitySnapshot(
+            hosts: recentHostHistory.hosts,
+            applications: recentApplicationHistory.applications,
+            activities: recentActivityHistory.activities
+        )
     }
 
     private func alarmMessage(from detail: String) -> String {

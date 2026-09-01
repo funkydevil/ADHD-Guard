@@ -255,6 +255,43 @@ final class GuardSessionStateTests: XCTestCase {
         XCTAssertTrue(episode.isAlarmLatched)
     }
 
+    func testSystemSleepFreezesDistractionCountdown() {
+        var episode = DistractionEpisode()
+        let start = Date(timeIntervalSince1970: 100)
+
+        XCTAssertEqual(
+            episode.remaining(
+                for: .distracted(detail: "Unlisted app", immediate: false),
+                now: start,
+                graceSeconds: 20
+            ),
+            20
+        )
+
+        episode.pause(at: start.addingTimeInterval(5))
+
+        XCTAssertEqual(
+            episode.remaining(
+                for: .distracted(detail: "Unlisted app", immediate: false),
+                now: start.addingTimeInterval(50),
+                graceSeconds: 20
+            ),
+            15
+        )
+
+        episode.resume(at: start.addingTimeInterval(50))
+
+        XCTAssertEqual(
+            episode.remaining(
+                for: .distracted(detail: "Unlisted app", immediate: false),
+                now: start.addingTimeInterval(57),
+                graceSeconds: 20
+            ),
+            8
+        )
+        XCTAssertNil(episode.pausedAt)
+    }
+
     func testRecentHostsAreNewestFirstDeduplicatedAndCapped() {
         var history = RecentHostHistory()
 
@@ -326,6 +363,27 @@ final class GuardSessionStateTests: XCTestCase {
                 "website|com.apple.safari|developer.apple.com"
             ]
         )
+    }
+
+    func testRecentActivityPersistenceRestoresAppsSitesAndUnifiedHistory() throws {
+        let suiteName = "ADHDGuardTests.RecentActivity.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let persistence = RecentActivityPersistence(defaults: defaults)
+        let application = RecentApplication(name: "Notes", bundleIdentifier: "com.apple.Notes")
+        let activity = try XCTUnwrap(
+            RecentActivity(context: applicationContext(name: application.name, bundle: application.bundleIdentifier))
+        )
+        let snapshot = RecentActivitySnapshot(
+            hosts: ["developer.apple.com"],
+            applications: [application],
+            activities: [activity]
+        )
+
+        persistence.save(snapshot)
+
+        XCTAssertEqual(persistence.load(), snapshot)
     }
 
     func testFocusReturnHistoryKeepsLastFocusedExternalContext() {

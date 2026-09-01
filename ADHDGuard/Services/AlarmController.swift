@@ -106,7 +106,8 @@ final class AlarmController: NSObject, ObservableObject, NSWindowDelegate {
                 rootView: AlarmOverlayView(
                     alarm: alarm,
                     onReturnToFocus: returnToFocus
-                ),
+                )
+                .preferredColorScheme(.dark),
                 onClick: returnToFocus
             )
             position(panel, on: screen, identifier: identifier)

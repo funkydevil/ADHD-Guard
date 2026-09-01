@@ -46,7 +46,7 @@ struct ApplicationRulesView: View {
                 }
             }
 
-            Text("This session only · activity history is not saved")
+            Text("Recent apps are saved locally on this Mac")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
 

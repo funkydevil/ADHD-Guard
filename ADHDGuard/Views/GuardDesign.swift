@@ -40,7 +40,6 @@ struct GuardStatusPresentation: Equatable {
     let state: GuardVisualState
     let title: String
     let detail: String
-    let symbol: String
     let color: Color
     let progress: Double
 
@@ -103,7 +102,6 @@ struct GuardStatusPresentation: Equatable {
             state = .paused
             title = "Paused"
             detail = "Reminders are paused. Activity stays visible locally."
-            symbol = "pause.fill"
             color = GuardPalette.paused
             progress = 1
             return
@@ -113,7 +111,6 @@ struct GuardStatusPresentation: Equatable {
             state = .alarm
             title = "Refocus now"
             detail = "Your focus buffer has ended."
-            symbol = "arrow.uturn.backward"
             color = GuardPalette.alarm
             progress = 1
             return
@@ -123,7 +120,6 @@ struct GuardStatusPresentation: Equatable {
             state = .grace(remaining)
             title = "\(remaining) seconds left"
             detail = "You’re outside your focus zone."
-            symbol = "hourglass"
             color = GuardPalette.warning
             progress = min(1, max(0.06, Double(remaining) / Double(max(1, graceSeconds))))
             return
@@ -134,21 +130,18 @@ struct GuardStatusPresentation: Equatable {
             state = .focused
             title = "Focused"
             detail = "Guard is quietly watching your activity."
-            symbol = "checkmark"
             color = GuardPalette.focused
             progress = 1
         case .distracted:
             state = .grace(graceSeconds)
             title = "Outside focus"
             detail = "Your focus buffer is ready to start."
-            symbol = "hourglass"
             color = GuardPalette.warning
             progress = 1
         case nil:
             state = .starting
             title = "Getting ready"
             detail = "Waiting for your first activity."
-            symbol = "scope"
             color = GuardPalette.accent
             progress = 0.68
         }
@@ -227,10 +220,39 @@ private struct FocusGateShape: Shape {
 }
 
 struct GuardMark: View {
-    let presentation: GuardStatusPresentation
     var size: CGFloat = 28
     var gateColor: Color = .primary
     var coreColor: Color? = nil
+
+    private let kind: GuardVisualKind
+    private let stateColor: Color
+
+    init(
+        presentation: GuardStatusPresentation,
+        size: CGFloat = 28,
+        gateColor: Color = .primary,
+        coreColor: Color? = nil
+    ) {
+        kind = presentation.kind
+        stateColor = presentation.color
+        self.size = size
+        self.gateColor = gateColor
+        self.coreColor = coreColor
+    }
+
+    init(
+        kind: GuardVisualKind,
+        color: Color,
+        size: CGFloat = 28,
+        gateColor: Color = .primary,
+        coreColor: Color? = nil
+    ) {
+        self.kind = kind
+        stateColor = color
+        self.size = size
+        self.gateColor = gateColor
+        self.coreColor = coreColor
+    }
 
     var body: some View {
         ZStack {
@@ -252,20 +274,20 @@ struct GuardMark: View {
 
     @ViewBuilder
     private var core: some View {
-        switch presentation.kind {
+        switch kind {
         case .focused:
             Circle()
-                .fill(coreColor ?? presentation.color)
+                .fill(coreColor ?? stateColor)
                 .frame(width: size * 0.24, height: size * 0.24)
         case .starting:
             Circle()
-                .stroke(coreColor ?? presentation.color, lineWidth: max(1.2, size * 0.06))
+                .stroke(coreColor ?? stateColor, lineWidth: max(1.2, size * 0.06))
                 .frame(width: size * 0.25, height: size * 0.25)
         case .grace:
             Circle()
                 .trim(from: 0.10, to: 0.88)
                 .stroke(
-                    coreColor ?? presentation.color,
+                    coreColor ?? stateColor,
                     style: StrokeStyle(lineWidth: max(1.3, size * 0.065), lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
@@ -273,7 +295,7 @@ struct GuardMark: View {
         case .alarm:
             ZStack {
                 RoundedRectangle(cornerRadius: size * 0.045, style: .continuous)
-                    .fill(coreColor ?? presentation.color)
+                    .fill(coreColor ?? stateColor)
                     .frame(width: size * 0.25, height: size * 0.25)
                     .rotationEffect(.degrees(45))
                 Text("!")
@@ -282,8 +304,8 @@ struct GuardMark: View {
             }
         case .paused:
             HStack(spacing: size * 0.06) {
-                Capsule().fill(coreColor ?? presentation.color)
-                Capsule().fill(coreColor ?? presentation.color)
+                Capsule().fill(coreColor ?? stateColor)
+                Capsule().fill(coreColor ?? stateColor)
             }
             .frame(width: size * 0.24, height: size * 0.25)
         }
@@ -317,17 +339,21 @@ struct CompactGuardStatus: View {
             .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
             .layoutPriority(1)
 
-            Group {
+            HStack(spacing: 8) {
                 if let shortValue = presentation.shortValue {
                     Text(shortValue)
                         .font(.system(size: 16, weight: .bold, design: .rounded).monospacedDigit())
-                } else {
-                    Image(systemName: presentation.symbol)
-                        .font(.system(size: 15, weight: .semibold))
                 }
+
+                GuardMark(
+                    presentation: presentation,
+                    size: 24,
+                    gateColor: .secondary,
+                    coreColor: presentation.color
+                )
             }
             .foregroundStyle(presentation.color)
-            .frame(minWidth: 28)
+            .frame(minWidth: 30)
             .fixedSize()
         }
         .padding(.horizontal, 13)
@@ -342,27 +368,15 @@ struct MenuBarStatusIcon: View {
     let presentation: GuardStatusPresentation
 
     var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: 15, weight: .semibold))
-            .symbolRenderingMode(.monochrome)
+        GuardMark(
+            presentation: presentation,
+            size: 17,
+            gateColor: .primary,
+            coreColor: .primary
+        )
             .frame(width: 18, height: 18)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("ADHD Guard, \(presentation.accessibilityTitle)")
-    }
-
-    private var symbol: String {
-        switch presentation.kind {
-        case .paused:
-            "pause.circle"
-        case .starting:
-            "ellipsis.circle"
-        case .focused:
-            "scope"
-        case .grace:
-            "timer"
-        case .alarm:
-            "exclamationmark.triangle.fill"
-        }
     }
 }
 
