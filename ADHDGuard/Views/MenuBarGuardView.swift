@@ -124,13 +124,20 @@ struct MenuBarGuardView: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
-            Spacer(minLength: 4)
-
             Button("Open app") {
                 open(.status)
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
+
+            Spacer(minLength: 4)
+
+            Button("Quit ADHD Guard") {
+                NSApp.terminate(nil)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(isDistractionAlertActive)
         }
     }
 

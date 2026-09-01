@@ -193,13 +193,28 @@ struct DashboardView: View {
 
         case let .website(host):
             let isDistractingSite = store.containsDistractingSite(host)
+            let isFocusApplication = store.containsFocusApplication(
+                bundleIdentifier: recentActivity.bundleIdentifier
+            )
+            let badgeTitle: String
+            let badgeColor: Color
+            if isDistractingSite {
+                badgeTitle = "Distracting site"
+                badgeColor = GuardPalette.alarm
+            } else if isFocusApplication {
+                badgeTitle = "Focus app"
+                badgeColor = GuardPalette.focused
+            } else {
+                badgeTitle = "Not in your lists"
+                badgeColor = GuardPalette.accent
+            }
             return DashboardActivity(
                 id: "recent|\(recentActivity.id)",
-                name: host,
+                name: recentActivity.applicationName,
                 bundleIdentifier: recentActivity.bundleIdentifier,
-                detail: "\(recentActivity.applicationName) · Recent site",
-                badgeTitle: isDistractingSite ? "Distracting site" : "Recent site",
-                badgeColor: isDistractingSite ? GuardPalette.alarm : GuardPalette.accent,
+                detail: host,
+                badgeTitle: badgeTitle,
+                badgeColor: badgeColor,
                 isCurrent: false,
                 isPlaceholder: false,
                 isWebsite: true,
