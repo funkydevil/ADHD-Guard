@@ -11,6 +11,7 @@ final class GuardMonitor: ObservableObject {
     @Published private(set) var lastDecision: RuleDecision?
     @Published private(set) var recentVisitedHosts: [String] = []
     @Published private(set) var recentApplications: [RecentApplication] = []
+    @Published private(set) var recentActivities: [RecentActivity] = []
     @Published private(set) var lastExternalContext: ActivityContext?
 
     private let store: ConfigurationStore
@@ -19,6 +20,7 @@ final class GuardMonitor: ObservableObject {
     private var distractionEpisode = DistractionEpisode()
     private var recentHostHistory = RecentHostHistory()
     private var recentApplicationHistory = RecentApplicationHistory()
+    private var recentActivityHistory = RecentActivityHistory()
     private var focusReturnHistory = FocusReturnHistory()
     private var lastBrowserReadAt = Date.distantPast
     private var cachedBrowserURL: URL?
@@ -83,6 +85,11 @@ final class GuardMonitor: ObservableObject {
             isUserVisibleApplication: application.activationPolicy == .regular
         )
         recordRecentHostIfNeeded(context: context)
+        recordRecentActivityIfNeeded(
+            context: context,
+            isOwnApplication: isOwnApplication,
+            isUserVisibleApplication: application.activationPolicy == .regular
+        )
 
         let decision = RuleEvaluator.evaluate(
             context: context,
@@ -288,6 +295,19 @@ final class GuardMonitor: ObservableObject {
             bundleIdentifier: context.bundleIdentifier
         )
         recentApplications = recentApplicationHistory.applications
+    }
+
+    private func recordRecentActivityIfNeeded(
+        context: ActivityContext,
+        isOwnApplication: Bool,
+        isUserVisibleApplication: Bool
+    ) {
+        guard isUserVisibleApplication,
+              !isOwnApplication,
+              !context.bundleIdentifier.hasPrefix("unknown.") else { return }
+
+        recentActivityHistory.record(context: context)
+        recentActivities = recentActivityHistory.activities
     }
 
     private func alarmMessage(from detail: String) -> String {

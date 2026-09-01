@@ -286,6 +286,48 @@ final class GuardSessionStateTests: XCTestCase {
         )
     }
 
+    func testRecentActivitiesKeepDifferentWebsitesFromTheSameBrowser() throws {
+        var history = RecentActivityHistory()
+
+        history.record(context: browserContext(url: "https://developer.apple.com/documentation"))
+        history.record(context: browserContext(url: "https://github.com/openai"))
+        history.record(context: browserContext(url: "https://developer.apple.com/swift"))
+
+        XCTAssertEqual(history.activities.count, 2)
+        XCTAssertEqual(
+            history.activities.map(\.id),
+            [
+                "website|com.apple.safari|developer.apple.com",
+                "website|com.apple.safari|github.com"
+            ]
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(history.activities.first?.browserURL).path,
+            "/swift"
+        )
+    }
+
+    func testRecentActivitiesKeepFourUniqueEntries() {
+        var history = RecentActivityHistory()
+
+        history.record(context: applicationContext(name: "Finder", bundle: "com.apple.finder"))
+        history.record(context: browserContext(url: "https://developer.apple.com"))
+        history.record(context: browserContext(url: "https://github.com"))
+        history.record(context: applicationContext(name: "Notes", bundle: "com.apple.Notes"))
+        history.record(context: applicationContext(name: "Music", bundle: "com.apple.Music"))
+
+        XCTAssertEqual(history.activities.count, 4)
+        XCTAssertEqual(
+            history.activities.map(\.id),
+            [
+                "application|com.apple.music",
+                "application|com.apple.notes",
+                "website|com.apple.safari|github.com",
+                "website|com.apple.safari|developer.apple.com"
+            ]
+        )
+    }
+
     func testFocusReturnHistoryKeepsLastFocusedExternalContext() {
         var history = FocusReturnHistory()
         let focusedContext = ActivityContext(
@@ -361,6 +403,26 @@ final class GuardSessionStateTests: XCTestCase {
     }
 
     private func contextForHistory(name: String, bundle: String) -> ActivityContext {
+        ActivityContext(
+            applicationName: name,
+            bundleIdentifier: bundle,
+            browserURL: nil,
+            isBrowser: false,
+            idleSeconds: 0
+        )
+    }
+
+    private func browserContext(url: String) -> ActivityContext {
+        ActivityContext(
+            applicationName: "Safari",
+            bundleIdentifier: "com.apple.Safari",
+            browserURL: URL(string: url),
+            isBrowser: true,
+            idleSeconds: 0
+        )
+    }
+
+    private func applicationContext(name: String, bundle: String) -> ActivityContext {
         ActivityContext(
             applicationName: name,
             bundleIdentifier: bundle,

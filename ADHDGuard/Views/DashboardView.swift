@@ -102,11 +102,13 @@ struct DashboardView: View {
 
     private var dashboardActivities: [DashboardActivity] {
         var activities: [DashboardActivity] = []
-        var seenBundleIdentifiers = Set<String>()
+        var seenActivityIDs = Set<String>()
 
         if let context = displayContext {
             let normalizedIdentifier = context.bundleIdentifier.lowercased()
-            seenBundleIdentifiers.insert(normalizedIdentifier)
+            let currentActivityID = RecentActivity(context: context)?.id
+                ?? "application|\(normalizedIdentifier)"
+            seenActivityIDs.insert(currentActivityID)
             activities.append(
                 DashboardActivity(
                     id: "current|\(normalizedIdentifier)|\(context.browserURL?.host ?? "app")",
@@ -123,28 +125,10 @@ struct DashboardView: View {
             )
         }
 
-        for application in monitor.recentApplications {
-            let normalizedIdentifier = application.bundleIdentifier.lowercased()
-            guard !seenBundleIdentifiers.contains(normalizedIdentifier) else { continue }
-            seenBundleIdentifiers.insert(normalizedIdentifier)
-            activities.append(
-                DashboardActivity(
-                    id: "recent|\(normalizedIdentifier)",
-                    name: application.name,
-                    bundleIdentifier: application.bundleIdentifier,
-                    detail: "Recently active",
-                    badgeTitle: store.containsFocusApplication(bundleIdentifier: application.bundleIdentifier)
-                        ? "Focus app"
-                        : "Recent app",
-                    badgeColor: store.containsFocusApplication(bundleIdentifier: application.bundleIdentifier)
-                        ? GuardPalette.focused
-                        : GuardPalette.accent,
-                    isCurrent: false,
-                    isPlaceholder: false,
-                    isWebsite: false,
-                    browserURL: nil
-                )
-            )
+        for recentActivity in monitor.recentActivities {
+            guard !seenActivityIDs.contains(recentActivity.id) else { continue }
+            seenActivityIDs.insert(recentActivity.id)
+            activities.append(dashboardActivity(from: recentActivity))
         }
 
         if activities.isEmpty {
@@ -186,6 +170,42 @@ struct DashboardView: View {
         }
 
         return activities
+    }
+
+    private func dashboardActivity(from recentActivity: RecentActivity) -> DashboardActivity {
+        switch recentActivity.kind {
+        case .application:
+            let isFocusApplication = store.containsFocusApplication(
+                bundleIdentifier: recentActivity.bundleIdentifier
+            )
+            return DashboardActivity(
+                id: "recent|\(recentActivity.id)",
+                name: recentActivity.applicationName,
+                bundleIdentifier: recentActivity.bundleIdentifier,
+                detail: "Recently active",
+                badgeTitle: isFocusApplication ? "Focus app" : "Recent app",
+                badgeColor: isFocusApplication ? GuardPalette.focused : GuardPalette.accent,
+                isCurrent: false,
+                isPlaceholder: false,
+                isWebsite: false,
+                browserURL: nil
+            )
+
+        case let .website(host):
+            let isDistractingSite = store.containsDistractingSite(host)
+            return DashboardActivity(
+                id: "recent|\(recentActivity.id)",
+                name: host,
+                bundleIdentifier: recentActivity.bundleIdentifier,
+                detail: "\(recentActivity.applicationName) · Recent site",
+                badgeTitle: isDistractingSite ? "Distracting site" : "Recent site",
+                badgeColor: isDistractingSite ? GuardPalette.alarm : GuardPalette.accent,
+                isCurrent: false,
+                isPlaceholder: false,
+                isWebsite: true,
+                browserURL: recentActivity.browserURL
+            )
+        }
     }
 
     private var contextClassification: String {

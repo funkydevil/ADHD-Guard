@@ -89,6 +89,63 @@ struct RecentApplicationHistory: Equatable {
     }
 }
 
+enum RecentActivityKind: Equatable {
+    case application
+    case website(host: String)
+}
+
+struct RecentActivity: Identifiable, Equatable {
+    let applicationName: String
+    let bundleIdentifier: String
+    let browserURL: URL?
+    let kind: RecentActivityKind
+
+    init?(context: ActivityContext) {
+        let applicationName = context.applicationName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let bundleIdentifier = context.bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !applicationName.isEmpty, !bundleIdentifier.isEmpty else { return nil }
+
+        self.applicationName = applicationName
+        self.bundleIdentifier = bundleIdentifier
+
+        if context.isBrowser,
+           let browserURL = context.browserURL,
+           let host = RuleEvaluator.normalizedHost(from: browserURL.host ?? "") {
+            self.browserURL = browserURL
+            kind = .website(host: host)
+        } else {
+            browserURL = nil
+            kind = .application
+        }
+    }
+
+    var id: String {
+        let normalizedBundleIdentifier = bundleIdentifier.lowercased()
+        switch kind {
+        case .application:
+            return "application|\(normalizedBundleIdentifier)"
+        case let .website(host):
+            return "website|\(normalizedBundleIdentifier)|\(host.lowercased())"
+        }
+    }
+}
+
+struct RecentActivityHistory: Equatable {
+    private(set) var activities: [RecentActivity] = []
+    let limit: Int
+
+    init(limit: Int = 4) {
+        self.limit = max(1, limit)
+    }
+
+    mutating func record(context: ActivityContext) {
+        guard let activity = RecentActivity(context: context) else { return }
+        activities.removeAll { $0.id == activity.id }
+        activities.insert(activity, at: 0)
+        activities = Array(activities.prefix(limit))
+    }
+}
+
 struct FocusReturnTarget: Equatable {
     let processIdentifier: pid_t
     let applicationName: String
