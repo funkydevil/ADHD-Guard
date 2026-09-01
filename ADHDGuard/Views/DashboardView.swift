@@ -17,7 +17,7 @@ struct DashboardView: View {
                         .multilineTextAlignment(.center)
                 }
 
-                FocusStatusObject(presentation: presentation)
+                RefractedStatusLens(presentation: presentation)
                     .padding(.vertical, 4)
 
                 if !store.configuration.monitoringEnabled {

@@ -25,6 +25,16 @@ private enum MenuPage: Int, CaseIterable, Identifiable {
     }
 }
 
+private enum MenuMetrics {
+    static let width: CGFloat = 352
+    static let height: CGFloat = 404
+    static let horizontalInset: CGFloat = 14
+    static let contentWidth: CGFloat = width - horizontalInset * 2
+    static let headerHeight: CGFloat = 52
+    static let bodyHeight: CGFloat = 302
+    static let footerHeight: CGFloat = 48
+}
+
 struct MenuBarGuardView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.openWindow) private var openWindow
@@ -33,39 +43,59 @@ struct MenuBarGuardView: View {
     @EnvironmentObject private var alarm: AlarmController
     @EnvironmentObject private var navigation: GuardNavigation
     @State private var page: MenuPage = .status
-    @State private var transitionDirection = 1
 
     var body: some View {
         ZStack {
-            GuardAuraBackground()
+            GuardAuraBackground(extendsUnderSafeArea: false)
 
-            VStack(spacing: 14) {
+            VStack(spacing: 0) {
                 header
+                    .frame(
+                        width: MenuMetrics.contentWidth,
+                        height: MenuMetrics.headerHeight
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
 
-                ZStack {
-                    pageContent
-                        .id(page)
-                        .transition(pageTransition)
+                Divider()
+
+                ScrollView {
+                    ZStack(alignment: .topLeading) {
+                        pageContent
+                            .id(page)
+                            .frame(width: MenuMetrics.contentWidth, alignment: .topLeading)
+                            .transition(pageTransition)
+                    }
+                    .frame(width: MenuMetrics.contentWidth, alignment: .topLeading)
+                    .padding(.horizontal, MenuMetrics.horizontalInset)
+                    .padding(.vertical, 12)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(width: MenuMetrics.width, height: MenuMetrics.bodyHeight)
                 .clipped()
 
+                Divider()
+
                 footer
+                    .frame(
+                        width: MenuMetrics.contentWidth,
+                        height: MenuMetrics.footerHeight
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(16)
+            .frame(width: MenuMetrics.width, height: MenuMetrics.height)
         }
-        .frame(width: 352, height: 404)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: page)
+        .frame(width: MenuMetrics.width, height: MenuMetrics.height)
+        .clipped()
     }
 
     private var header: some View {
         HStack(spacing: 10) {
-            Image(systemName: "scope")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 32, height: 32)
-                .background(GuardPalette.accent, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .shadow(color: GuardPalette.accent.opacity(0.28), radius: 8, y: 4)
+            GuardMark(
+                presentation: presentation,
+                size: 28,
+                gateColor: .primary.opacity(0.82),
+                coreColor: presentation.color
+            )
+            .frame(width: 30, height: 30)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("ADHD Guard")
@@ -73,8 +103,6 @@ struct MenuBarGuardView: View {
             }
 
             Spacer()
-
-            StatusBadge(title: presentation.shortValue ?? presentation.title, color: presentation.color)
 
             Menu {
                 Button("Open ADHD Guard", action: { open(.status) })
@@ -115,7 +143,6 @@ struct MenuBarGuardView: View {
             .buttonStyle(.bordered)
             .controlSize(.small)
         }
-        .padding(.horizontal, 3)
     }
 
     @ViewBuilder
@@ -131,69 +158,65 @@ struct MenuBarGuardView: View {
     }
 
     private var statusPage: some View {
-        ScrollView {
-            VStack(spacing: 10) {
-                CompactGuardStatus(presentation: presentation)
+        VStack(spacing: 10) {
+            CompactGuardStatus(presentation: presentation)
 
-                VStack(alignment: .leading, spacing: 9) {
-                    HStack(spacing: 12) {
-                        if let context = displayContext {
-                            ApplicationIcon(bundleIdentifier: context.bundleIdentifier, size: 38)
-                        } else {
-                            Image(systemName: "sparkles")
-                                .foregroundStyle(GuardPalette.accent)
-                                .frame(width: 38, height: 38)
-                        }
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(displayContext?.applicationName ?? "Waiting for activity")
-                                .font(.subheadline.weight(.semibold))
-                                .lineLimit(1)
-                            Text(displayContext?.browserURL?.host ?? contextClassification)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-
-                        Spacer()
-                        StatusBadge(title: contextClassification, color: classificationColor)
+            VStack(alignment: .leading, spacing: 9) {
+                HStack(spacing: 10) {
+                    if let context = displayContext {
+                        ApplicationIcon(bundleIdentifier: context.bundleIdentifier, size: 36)
+                    } else {
+                        GuardMark(
+                            presentation: presentation,
+                            size: 28,
+                            gateColor: .secondary,
+                            coreColor: presentation.color
+                        )
+                        .frame(width: 36, height: 36)
                     }
 
-                    if let contextActionTitle {
-                        Button(action: performContextAction) {
-                            Label(
-                                contextActionTitle,
-                                systemImage: displayContext?.browserURL?.host == nil
-                                    ? "app.badge.checkmark"
-                                    : "exclamationmark.shield"
-                            )
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(contextActionColor)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(displayContext?.applicationName ?? "Waiting for activity")
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                        Text(displayContext?.browserURL?.host ?? contextClassification)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
+                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                    .layoutPriority(1)
+
+                    StatusBadge(title: contextClassification, color: classificationColor)
+                        .fixedSize()
                 }
-                .padding(13)
-                .guardCard(cornerRadius: 16)
 
-                HStack(spacing: 8) {
-                    MenuCollectionTile(
-                        title: "Focus Apps",
-                        count: store.configuration.applicationRules.count,
-                        symbol: "app.badge.checkmark",
-                        color: GuardPalette.focused,
-                        action: { select(.focus) }
-                    )
-                    MenuCollectionTile(
-                        title: "Distracting Sites",
-                        count: store.configuration.websiteRules.count,
-                        symbol: "globe.badge.chevron.backward",
-                        color: GuardPalette.alarm,
-                        action: { select(.sites) }
-                    )
+                if let contextActionTitle {
+                    Button(action: performContextAction) {
+                        Label(
+                            contextActionTitle,
+                            systemImage: displayContext?.browserURL?.host == nil
+                                ? "app.badge.checkmark"
+                                : "exclamationmark.shield"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(contextActionColor)
                 }
             }
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 98, alignment: .leading)
+            .guardCard(cornerRadius: 16)
+
+            MenuCollectionsCard(
+                focusCount: store.configuration.applicationRules.count,
+                siteCount: store.configuration.websiteRules.count,
+                openFocus: { select(.focus) },
+                openSites: { select(.sites) }
+            )
         }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
     private var focusPage: some View {
@@ -311,17 +334,14 @@ struct MenuBarGuardView: View {
 
     private var pageTransition: AnyTransition {
         guard !reduceMotion else { return .opacity }
-        let insertionEdge: Edge = transitionDirection > 0 ? .trailing : .leading
-        let removalEdge: Edge = transitionDirection > 0 ? .leading : .trailing
         return .asymmetric(
-            insertion: .move(edge: insertionEdge).combined(with: .opacity),
-            removal: .move(edge: removalEdge).combined(with: .opacity)
+            insertion: .opacity.combined(with: .scale(scale: 0.985, anchor: .center)),
+            removal: .opacity
         )
     }
 
     private func select(_ newPage: MenuPage) {
-        transitionDirection = newPage.rawValue >= page.rawValue ? 1 : -1
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+        withAnimation(reduceMotion ? .easeOut(duration: 0.11) : .easeOut(duration: 0.16)) {
             page = newPage
         }
     }
@@ -363,37 +383,69 @@ struct MenuBarGuardView: View {
     }
 }
 
-private struct MenuCollectionTile: View {
-    let title: String
-    let count: Int
-    let symbol: String
-    let color: Color
-    let action: () -> Void
+private struct MenuCollectionsCard: View {
+    let focusCount: Int
+    let siteCount: Int
+    let openFocus: () -> Void
+    let openSites: () -> Void
 
     var body: some View {
+        VStack(spacing: 0) {
+            row(
+                title: "Focus Apps",
+                count: focusCount,
+                symbol: "app.badge.checkmark",
+                color: GuardPalette.focused,
+                action: openFocus
+            )
+
+            Divider()
+                .padding(.leading, 38)
+
+            row(
+                title: "Distracting Sites",
+                count: siteCount,
+                symbol: "globe.badge.chevron.backward",
+                color: GuardPalette.alarm,
+                action: openSites
+            )
+        }
+        .guardCard(cornerRadius: 15)
+    }
+
+    private func row(
+        title: String,
+        count: Int,
+        symbol: String,
+        color: Color,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 Image(systemName: symbol)
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(color)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(.caption.weight(.semibold))
-                        .lineLimit(1)
-                    Text("\(count) saved")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
+                    .frame(width: 22)
+
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+
+                Spacer(minLength: 8)
+
+                Text("\(count)")
+                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(color)
+
                 Image(systemName: "chevron.right")
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 10)
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .contentShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+            .padding(.horizontal, 11)
+            .frame(maxWidth: .infinity, minHeight: 42)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .guardCard(cornerRadius: 13)
     }
 }
 
@@ -416,8 +468,7 @@ private struct MenuListPage: View {
     let manageAction: () -> Void
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top) {
                     Button(action: backAction) {
                         Image(systemName: "chevron.left")
@@ -489,8 +540,8 @@ private struct MenuListPage: View {
                     .buttonStyle(.borderedProminent)
                     .tint(color)
                     .frame(maxWidth: .infinity)
-            }
-            .padding(2)
         }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .padding(2)
     }
 }

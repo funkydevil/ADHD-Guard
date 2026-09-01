@@ -51,6 +51,7 @@ final class GuardNavigation: ObservableObject {
 
 struct RootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @EnvironmentObject private var store: ConfigurationStore
     @EnvironmentObject private var monitor: GuardMonitor
     @EnvironmentObject private var navigation: GuardNavigation
 
@@ -59,7 +60,10 @@ struct RootView: View {
             GuardAuraBackground()
 
             HStack(spacing: 0) {
-                GlassNavigationRail(selection: $navigation.selection)
+                GlassNavigationRail(
+                    selection: $navigation.selection,
+                    presentation: presentation
+                )
                     .frame(width: 176)
 
                 ZStack {
@@ -97,12 +101,22 @@ struct RootView: View {
                 removal: .move(edge: .leading).combined(with: .opacity)
             )
     }
+
+    private var presentation: GuardStatusPresentation {
+        GuardStatusPresentation(
+            monitoringEnabled: store.configuration.monitoringEnabled,
+            decision: monitor.lastDecision,
+            remaining: monitor.distractionRemaining,
+            graceSeconds: store.configuration.distractionGraceSeconds
+        )
+    }
 }
 
 private struct GlassNavigationRail: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Binding var selection: GuardSection
+    let presentation: GuardStatusPresentation
     @Namespace private var selectionNamespace
 
     var body: some View {
@@ -147,9 +161,12 @@ private struct GlassNavigationRail: View {
 
     private var brand: some View {
         HStack(spacing: 10) {
-            Image(systemName: "scope")
-                .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(.white)
+            GuardMark(
+                presentation: presentation,
+                size: 23,
+                gateColor: .white.opacity(0.9),
+                coreColor: .white
+            )
                 .frame(width: 34, height: 34)
                 .background(
                     LinearGradient(
@@ -176,9 +193,20 @@ private struct GlassNavigationRail: View {
             }
         } label: {
             HStack(spacing: 11) {
-                Image(systemName: section.symbol)
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 20)
+                Group {
+                    if section == .status {
+                        GuardMark(
+                            presentation: presentation,
+                            size: 18,
+                            gateColor: selection == section ? .primary : .secondary,
+                            coreColor: presentation.color
+                        )
+                    } else {
+                        Image(systemName: section.symbol)
+                            .font(.system(size: 15, weight: .semibold))
+                    }
+                }
+                .frame(width: 20)
                 Text(section.title)
                     .font(.subheadline.weight(.semibold))
                 Spacer(minLength: 0)
