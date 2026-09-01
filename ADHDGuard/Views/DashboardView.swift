@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct DashboardView: View {
@@ -25,7 +26,8 @@ struct DashboardView: View {
                     activities: dashboardActivities,
                     actionTitle: contextActionTitle,
                     actionColor: contextActionColor,
-                    action: performContextAction
+                    action: performContextAction,
+                    openActivity: openActivity
                 )
 
                 HStack(spacing: 14) {
@@ -115,7 +117,8 @@ struct DashboardView: View {
                     badgeColor: classificationColor,
                     isCurrent: true,
                     isPlaceholder: false,
-                    isWebsite: context.browserURL != nil
+                    isWebsite: context.browserURL != nil,
+                    browserURL: context.browserURL
                 )
             )
         }
@@ -138,7 +141,8 @@ struct DashboardView: View {
                         : GuardPalette.accent,
                     isCurrent: false,
                     isPlaceholder: false,
-                    isWebsite: false
+                    isWebsite: false,
+                    browserURL: nil
                 )
             )
         }
@@ -154,7 +158,8 @@ struct DashboardView: View {
                     badgeColor: GuardPalette.accent,
                     isCurrent: true,
                     isPlaceholder: false,
-                    isWebsite: false
+                    isWebsite: false,
+                    browserURL: nil
                 )
             )
         }
@@ -174,7 +179,8 @@ struct DashboardView: View {
                     badgeColor: GuardPalette.accent,
                     isCurrent: false,
                     isPlaceholder: true,
-                    isWebsite: false
+                    isWebsite: false,
+                    browserURL: nil
                 )
             )
         }
@@ -238,6 +244,57 @@ struct DashboardView: View {
             )
         }
     }
+
+    private func openActivity(_ activity: DashboardActivity) {
+        guard !activity.isPlaceholder,
+              let bundleIdentifier = activity.bundleIdentifier else { return }
+
+        let workspace = NSWorkspace.shared
+        let applicationURL = workspace.urlForApplication(withBundleIdentifier: bundleIdentifier)
+
+        if let browserURL = activity.browserURL,
+           let descriptor = BrowserURLReader.descriptor(for: bundleIdentifier) {
+            if BrowserURLReader.activateExistingTab(url: browserURL, for: descriptor) {
+                return
+            }
+
+            if let applicationURL {
+                let configuration = NSWorkspace.OpenConfiguration()
+                configuration.activates = true
+                workspace.open(
+                    [browserURL],
+                    withApplicationAt: applicationURL,
+                    configuration: configuration
+                )
+                return
+            }
+        }
+
+        if let runningApplication = workspace.runningApplications.first(where: {
+            $0.bundleIdentifier?.caseInsensitiveCompare(bundleIdentifier) == .orderedSame
+        }) {
+            runningApplication.unhide()
+            if #available(macOS 14.0, *) {
+                NSApp.activate(ignoringOtherApps: true)
+                NSApp.yieldActivation(to: runningApplication)
+                _ = runningApplication.activate(
+                    from: NSRunningApplication.current,
+                    options: [.activateAllWindows]
+                )
+            } else {
+                _ = runningApplication.activate(
+                    options: [.activateAllWindows, .activateIgnoringOtherApps]
+                )
+            }
+            return
+        }
+
+        if let applicationURL {
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = true
+            workspace.openApplication(at: applicationURL, configuration: configuration)
+        }
+    }
 }
 
 private struct DashboardActivity: Identifiable {
@@ -250,6 +307,7 @@ private struct DashboardActivity: Identifiable {
     let isCurrent: Bool
     let isPlaceholder: Bool
     let isWebsite: Bool
+    let browserURL: URL?
 }
 
 private struct AuroraActivityScene: View {
@@ -262,6 +320,7 @@ private struct AuroraActivityScene: View {
     let actionTitle: String?
     let actionColor: Color
     let action: () -> Void
+    let openActivity: (DashboardActivity) -> Void
 
     var body: some View {
         ZStack {
@@ -273,7 +332,8 @@ private struct AuroraActivityScene: View {
                     activities: activities,
                     actionTitle: actionTitle,
                     actionColor: actionColor,
-                    action: action
+                    action: action,
+                    openActivity: openActivity
                 )
             }
             .padding(.horizontal, 24)
@@ -452,66 +512,79 @@ private struct PerspectiveActivityStack: View {
     let actionTitle: String?
     let actionColor: Color
     let action: () -> Void
+    let openActivity: (DashboardActivity) -> Void
 
     var body: some View {
-        ZStack(alignment: .top) {
+        VStack(spacing: 7) {
             ForEach(activities) { activity in
                 let depth = activities.firstIndex(where: { $0.id == activity.id }) ?? 0
                 PerspectiveActivityRow(
                     activity: activity,
+                    depth: depth,
                     actionTitle: activity.isCurrent ? actionTitle : nil,
                     actionColor: actionColor,
-                    action: action
+                    action: action,
+                    openActivity: { openActivity(activity) }
                 )
-                .scaleEffect(1 - CGFloat(depth) * 0.055, anchor: .top)
+                .scaleEffect(1 - CGFloat(depth) * 0.045)
                 .rotation3DEffect(
-                    .degrees(Double(depth) * -4.2),
+                    .degrees(Double(depth) * -1.6),
                     axis: (x: 1, y: 0, z: 0),
-                    anchor: .top,
-                    perspective: 0.55
+                    anchor: .center,
+                    perspective: 0.42
                 )
-                .offset(y: CGFloat(depth) * 46)
-                .opacity(1 - Double(depth) * 0.20)
-                .zIndex(Double(activities.count - depth))
+                .opacity(1 - Double(depth) * 0.18)
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 174, alignment: .top)
+        .frame(height: 205, alignment: .top)
     }
 }
 
 private struct PerspectiveActivityRow: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isFloating = false
+    @State private var isHovering = false
+
     let activity: DashboardActivity
+    let depth: Int
     let actionTitle: String?
     let actionColor: Color
     let action: () -> Void
+    let openActivity: () -> Void
 
     var body: some View {
         HStack(spacing: 13) {
-            if let bundleIdentifier = activity.bundleIdentifier {
-                ApplicationIcon(bundleIdentifier: bundleIdentifier, size: 40)
-            } else {
-                Image(systemName: activity.isPlaceholder ? "clock.arrow.circlepath" : "sparkles")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.78))
-                    .frame(width: 40, height: 40)
-                    .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
-            }
+            Button(action: openActivity) {
+                HStack(spacing: 13) {
+                    activityIcon
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(activity.name)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                Text(activity.detail)
-                    .font(activity.isWebsite ? .caption.monospaced() : .caption)
-                    .foregroundStyle(.white.opacity(0.66))
-                    .lineLimit(1)
-            }
-            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(activity.name)
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                        Text(activity.detail)
+                            .font(activity.isWebsite ? .caption.monospaced() : .caption)
+                            .foregroundStyle(.white.opacity(0.66))
+                            .lineLimit(1)
+                    }
+                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
 
-            StatusBadge(title: activity.badgeTitle, color: activity.badgeColor)
-                .fixedSize()
+                    StatusBadge(title: activity.badgeTitle, color: activity.badgeColor)
+                        .fixedSize()
+
+                    if !activity.isPlaceholder {
+                        Image(systemName: "arrow.up.forward.app")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(isHovering ? 0.82 : 0.46))
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(activity.isPlaceholder)
+            .help(activity.isPlaceholder ? "" : "Switch to \(activity.name)")
 
             if let actionTitle {
                 Button(action: action) {
@@ -528,13 +601,51 @@ private struct PerspectiveActivityRow: View {
                 .fixedSize()
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 14)
         .frame(maxWidth: .infinity)
-        .frame(height: 78)
-        .background(.black.opacity(activity.isCurrent ? 0.24 : 0.16), in: RoundedRectangle(cornerRadius: 20))
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .frame(height: 62)
+        .background(
+            .black.opacity((activity.isCurrent ? 0.24 : 0.16) + (isHovering ? 0.08 : 0)),
+            in: RoundedRectangle(cornerRadius: 18)
+        )
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
         .opacity(activity.isPlaceholder ? 0.72 : 1)
+        .offset(
+            x: reduceMotion ? 0 : (isFloating ? floatingX : -floatingX),
+            y: reduceMotion ? 0 : (isFloating ? -1.4 : 1.4)
+        )
+        .animation(
+            reduceMotion
+                ? nil
+                : .easeInOut(duration: 4.8 + Double(depth) * 0.65).repeatForever(autoreverses: true),
+            value: isFloating
+        )
+        .animation(.easeOut(duration: 0.16), value: isHovering)
+        .onAppear { updateFloatingState() }
+        .onChange(of: reduceMotion) { _ in updateFloatingState() }
+        .onHover { isHovering = $0 && !activity.isPlaceholder }
         .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder
+    private var activityIcon: some View {
+        if let bundleIdentifier = activity.bundleIdentifier {
+            ApplicationIcon(bundleIdentifier: bundleIdentifier, size: 36)
+        } else {
+            Image(systemName: activity.isPlaceholder ? "clock.arrow.circlepath" : "sparkles")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.78))
+                .frame(width: 36, height: 36)
+                .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 11))
+        }
+    }
+
+    private var floatingX: CGFloat {
+        depth.isMultiple(of: 2) ? 0.8 : -0.8
+    }
+
+    private func updateFloatingState() {
+        isFloating = !reduceMotion
     }
 }
 
