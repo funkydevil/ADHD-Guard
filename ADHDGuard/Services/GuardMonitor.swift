@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import CoreGraphics
 import Foundation
 
 @MainActor
@@ -25,6 +26,8 @@ final class GuardMonitor: ObservableObject {
     private var focusReturnHistory = FocusReturnHistory()
     private var workspaceLifecycleCancellables = Set<AnyCancellable>()
     private var isComputerSleeping = false
+    private var isScreenLocked = false
+    private let screenLockStatus: () -> Bool?
     private var lastBrowserReadAt = Date.distantPast
     private var cachedBrowserURL: URL?
     private var cachedBrowserBundleIdentifier: String?
@@ -32,10 +35,19 @@ final class GuardMonitor: ObservableObject {
     init(
         store: ConfigurationStore,
         alarm: AlarmController,
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        screenLockStatus: @escaping () -> Bool? = {
+            guard let session = CGSessionCopyCurrentDictionary() as? [String: Any] else {
+                return nil
+            }
+            // macOS omits this key when the session is unlocked.
+            return session["CGSSessionScreenIsLocked"] as? Bool ?? false
+        }
     ) {
         self.store = store
         self.alarm = alarm
+        self.screenLockStatus = screenLockStatus
+        isScreenLocked = screenLockStatus() ?? true
         let persistence = RecentActivityPersistence(defaults: defaults)
         recentActivityPersistence = persistence
 
@@ -76,7 +88,14 @@ final class GuardMonitor: ObservableObject {
     }
 
     func checkNow() {
-        guard !isComputerSleeping else { return }
+        if let locked = screenLockStatus() {
+            isScreenLocked = locked
+        }
+        guard !isComputerSleeping, !isScreenLocked else {
+            suspendMonitoring(at: Date())
+            return
+        }
+        distractionEpisode.resume(at: Date())
 
         let configuration = store.configuration
 
@@ -133,6 +152,15 @@ final class GuardMonitor: ObservableObject {
             isOwnApplication: isOwnApplication,
             isUserVisibleApplication: application.activationPolicy == .regular
         )
+        // Browser Apple Events can block; recheck in case the screen locked
+        // while the URL was being read.
+        if let locked = screenLockStatus() {
+            isScreenLocked = locked
+        }
+        guard !isScreenLocked else {
+            suspendMonitoring(at: Date())
+            return
+        }
         apply(decision: decision, context: context, configuration: configuration)
     }
 
@@ -223,6 +251,16 @@ final class GuardMonitor: ObservableObject {
     }
 
     private func subscribeToWorkspaceLifecycle() {
+        let distributedCenter = DistributedNotificationCenter.default()
+        for (name, locked) in [("com.apple.screenIsLocked", true), ("com.apple.screenIsUnlocked", false)] {
+            distributedCenter.publisher(for: Notification.Name(name))
+                .receive(on: RunLoop.main)
+                .sink { [weak self] _ in
+                    self?.handleScreenLockChanged(locked, at: Date())
+                }
+                .store(in: &workspaceLifecycleCancellables)
+        }
+
         let notificationCenter = NSWorkspace.shared.notificationCenter
         notificationCenter.publisher(for: NSWorkspace.willSleepNotification)
             .receive(on: RunLoop.main)
@@ -239,15 +277,30 @@ final class GuardMonitor: ObservableObject {
             .store(in: &workspaceLifecycleCancellables)
     }
 
-    private func handleSystemWillSleep(at date: Date) {
-        guard !isComputerSleeping else { return }
-        isComputerSleeping = true
-        distractionEpisode.pause(at: date)
+    func handleScreenLockChanged(_ locked: Bool, at date: Date) {
+        isScreenLocked = locked
+        if locked {
+            suspendMonitoring(at: date)
+        } else {
+            lastBrowserReadAt = .distantPast
+            checkNow()
+        }
     }
 
-    private func handleSystemDidWake(at date: Date) {
+    private func suspendMonitoring(at date: Date) {
+        distractionEpisode.pause(at: date)
+        alarm.dismiss()
+        statusText = isScreenLocked ? "Screen is locked" : "Computer is sleeping"
+    }
+
+    func handleSystemWillSleep(at date: Date) {
+        guard !isComputerSleeping else { return }
+        isComputerSleeping = true
+        suspendMonitoring(at: date)
+    }
+
+    func handleSystemDidWake(at date: Date) {
         guard isComputerSleeping else { return }
-        distractionEpisode.resume(at: date)
         isComputerSleeping = false
         checkNow()
     }

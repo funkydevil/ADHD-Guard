@@ -718,3 +718,84 @@ final class ConfigurationStoreTests: XCTestCase {
         })
     }
 }
+
+@MainActor
+final class GuardMonitorLockScreenTests: XCTestCase {
+    func testStartingWhileLockedSkipsActivityAndAlarms() throws {
+        try withMonitor(lockStatus: { true }) { monitor, alarm in
+            monitor.checkNow()
+            XCTAssertNil(monitor.currentContext)
+            XCTAssertNil(monitor.lastDecision)
+            XCTAssertNil(alarm.activeAlarm)
+            XCTAssertEqual(monitor.statusText, "Screen is locked")
+        }
+    }
+
+    func testLockStopsAnExistingAlarmAndWakeDoesNotRestartIt() throws {
+        try withMonitor(lockStatus: { true }) { monitor, alarm in
+            alarm.present(
+                kind: .distraction, title: "Test", message: "Test", phrase: "",
+                speaks: false, playsSound: false, returnToFocus: {}
+            )
+            XCTAssertNotNil(alarm.activeAlarm)
+            monitor.handleScreenLockChanged(true, at: Date())
+            XCTAssertNil(alarm.activeAlarm)
+
+            monitor.handleSystemWillSleep(at: Date())
+            monitor.handleSystemDidWake(at: Date())
+            monitor.checkNow()
+            XCTAssertNil(alarm.activeAlarm)
+            XCTAssertNil(monitor.currentContext)
+            XCTAssertEqual(monitor.statusText, "Screen is locked")
+        }
+    }
+
+    func testUnlockDuringSleepDoesNotResumeMonitoring() throws {
+        try withMonitor(lockStatus: { nil }) { monitor, alarm in
+            monitor.handleScreenLockChanged(true, at: Date())
+            monitor.handleSystemWillSleep(at: Date())
+            monitor.handleScreenLockChanged(false, at: Date())
+            monitor.checkNow()
+            XCTAssertNil(monitor.currentContext)
+            XCTAssertNil(alarm.activeAlarm)
+            XCTAssertEqual(monitor.statusText, "Computer is sleeping")
+        }
+    }
+
+    func testUnlockResumesChecksAfterSleepHasEnded() throws {
+        try withMonitor(lockStatus: { nil }, monitoringEnabled: false) { monitor, alarm in
+            monitor.handleScreenLockChanged(true, at: Date())
+            monitor.handleSystemWillSleep(at: Date())
+            monitor.handleSystemDidWake(at: Date())
+            XCTAssertEqual(monitor.statusText, "Screen is locked")
+            monitor.handleScreenLockChanged(false, at: Date())
+            XCTAssertNotEqual(monitor.statusText, "Screen is locked")
+            XCTAssertNotEqual(monitor.statusText, "Computer is sleeping")
+            XCTAssertNil(alarm.activeAlarm)
+        }
+    }
+
+    func testUnknownSessionAtStartupSuppressesAlarms() throws {
+        try withMonitor(lockStatus: { nil }) { monitor, alarm in
+            monitor.checkNow()
+            XCTAssertNil(monitor.currentContext)
+            XCTAssertNil(alarm.activeAlarm)
+        }
+    }
+
+    private func withMonitor(
+        lockStatus: @escaping () -> Bool?,
+        monitoringEnabled: Bool = true,
+        body: (GuardMonitor, AlarmController) -> Void
+    ) throws {
+        let suite = "ADHDGuardTests.LockScreen.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = ConfigurationStore(defaults: defaults)
+        store.configuration.monitoringEnabled = monitoringEnabled
+        let alarm = AlarmController()
+        defer { alarm.dismiss() }
+        let monitor = GuardMonitor(store: store, alarm: alarm, defaults: defaults, screenLockStatus: lockStatus)
+        body(monitor, alarm)
+    }
+}
