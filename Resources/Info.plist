@@ -25,7 +25,7 @@
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>ADHD Guard reads only the active browser tab URL to compare it with your local focus rules.</string>
+    <string>ADHD Guard reads the active browser tab URL to check your local focus rules. When you choose to return to a website, it searches open tab URLs and activates the matching tab.</string>
     <key>NSHumanReadableCopyright</key>
     <string>Copyright © 2026</string>
     <key>NSPrincipalClass</key>
