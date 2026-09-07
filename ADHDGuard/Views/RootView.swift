@@ -39,8 +39,8 @@ enum RuleCollection: String, CaseIterable, Identifiable {
 
     var subtitle: String {
         switch self {
-        case .focusApps: "Apps that keep you in flow."
-        case .distractingSites: "Sites that start your focus timer."
+        case .focusApps: "Other apps start the reminder timer when Focus mode is on."
+        case .distractingSites: "These sites start the reminder timer, even in a focus browser."
         }
     }
 }

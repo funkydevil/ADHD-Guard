@@ -37,7 +37,7 @@ struct ADHDGuardApp: App {
         .defaultSize(width: 980, height: 680)
         .commands {
             CommandMenu("Guard") {
-                Toggle("Monitoring", isOn: $store.configuration.monitoringEnabled)
+                Toggle("Focus mode", isOn: $store.configuration.monitoringEnabled)
                     .keyboardShortcut("g", modifiers: [.command, .shift])
                     .disabled(alarm.activeAlarm?.kind == .distraction)
                 Button("Preview Reminder") {

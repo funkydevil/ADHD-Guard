@@ -9,45 +9,77 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 22) {
-                VStack(spacing: 7) {
-                    Text("Your focus. Safeguarded.")
-                        .font(.system(size: 30, weight: .semibold, design: .rounded))
-                    Text("See what has your attention — and shape your focus zone in one click.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+            VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 16) {
+                    FocusModeControl(
+                        isOn: $store.configuration.monitoringEnabled,
+                        isLocked: isDistractionAlertActive,
+                        graceSeconds: store.configuration.distractionGraceSeconds,
+                        remaining: monitor.distractionRemaining
+                    )
+                }
+                .padding(20)
+                .guardCard(cornerRadius: 20)
+                .background {
+                    AuroraBackdrop(presentation: presentation)
+                        .opacity(0.5)
                 }
 
-                AuroraActivityScene(
-                    presentation: presentation,
-                    monitoringEnabled: $store.configuration.monitoringEnabled,
-                    guardControlDisabled: isDistractionAlertActive,
-                    activities: dashboardActivities,
-                    actionTitle: contextActionTitle,
-                    actionColor: contextActionColor,
-                    action: performContextAction,
-                    openActivity: openActivity
-                )
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(activityHeading)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    if let activity = dashboardActivities.first {
+                        DashboardActivityRow(
+                            activity: activity,
+                            openActivity: { openActivity(activity) }
+                        )
+                    }
+                    if let contextActionTitle {
+                        Button(contextActionTitle, action: performContextAction)
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                    }
+                }
 
-                HStack(spacing: 14) {
-                    RuleShortcutCard(
-                        title: "Focus apps",
-                        count: store.configuration.applicationRules.count,
-                        detail: "Apps that keep you in flow",
-                        symbol: "app.badge.checkmark",
-                        color: GuardPalette.focused,
-                        action: { navigation.openRules(.focusApps) }
-                    )
+                if dashboardActivities.count > 1 {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Recent activity")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        VStack(spacing: 6) {
+                            ForEach(dashboardActivities.dropFirst()) { activity in
+                                DashboardActivityRow(
+                                    activity: activity,
+                                    openActivity: { openActivity(activity) }
+                                )
+                            }
+                        }
+                    }
+                }
 
-                    RuleShortcutCard(
-                        title: "Distracting sites",
-                        count: store.configuration.websiteRules.count,
-                        detail: "Sites that start the timer",
-                        symbol: "globe.badge.chevron.backward",
-                        color: GuardPalette.alarm,
-                        action: { navigation.openRules(.distractingSites) }
-                    )
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Your focus lists")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 14) {
+                        RuleShortcutCard(
+                            title: "Focus apps",
+                            count: store.configuration.applicationRules.count,
+                            detail: "Other apps start the timer",
+                            symbol: "app.badge.checkmark",
+                            color: GuardPalette.focused,
+                            action: { navigation.openRules(.focusApps) }
+                        )
+                        RuleShortcutCard(
+                            title: "Distracting sites",
+                            count: store.configuration.websiteRules.count,
+                            detail: "Sites that start the timer",
+                            symbol: "globe.badge.chevron.backward",
+                            color: GuardPalette.alarm,
+                            action: { navigation.openRules(.distractingSites) }
+                        )
+                    }
                 }
 
                 if let browserAccessMessage = monitor.browserAccessMessage {
@@ -64,6 +96,12 @@ struct DashboardView: View {
             .padding(.vertical, 28)
             .frame(maxWidth: .infinity)
         }
+    }
+
+    private var activityHeading: String {
+        let ownIdentifier = Bundle.main.bundleIdentifier ?? "com.funkydevil.ADHDGuard"
+        return monitor.currentContext?.bundleIdentifier.caseInsensitiveCompare(ownIdentifier) == .orderedSame
+            ? "Last active" : "Current activity"
     }
 
     private var displayContext: ActivityContext? {
@@ -114,12 +152,10 @@ struct DashboardView: View {
                     id: "current|\(normalizedIdentifier)|\(context.browserURL?.host ?? "app")",
                     name: context.applicationName,
                     bundleIdentifier: context.bundleIdentifier,
-                    detail: context.browserURL?.host ?? "Current activity",
+                    detail: context.browserURL?.host ?? "Application",
                     badgeTitle: contextClassification,
                     badgeColor: classificationColor,
                     isCurrent: true,
-                    isPlaceholder: false,
-                    isWebsite: context.browserURL != nil,
                     browserURL: context.browserURL
                 )
             )
@@ -141,35 +177,12 @@ struct DashboardView: View {
                     badgeTitle: "Ready",
                     badgeColor: GuardPalette.accent,
                     isCurrent: true,
-                    isPlaceholder: false,
-                    isWebsite: false,
                     browserURL: nil
                 )
             )
         }
 
-        activities = Array(activities.prefix(4))
-        while activities.count < 4 {
-            let slot = activities.count
-            activities.append(
-                DashboardActivity(
-                    id: "empty|\(slot)",
-                    name: "Recent activity",
-                    bundleIdentifier: nil,
-                    detail: slot == 1
-                        ? "Your next app will appear here"
-                        : "History stays on this Mac",
-                    badgeTitle: "Next",
-                    badgeColor: GuardPalette.accent,
-                    isCurrent: false,
-                    isPlaceholder: true,
-                    isWebsite: false,
-                    browserURL: nil
-                )
-            )
-        }
-
-        return activities
+        return Array(activities.prefix(4))
     }
 
     private func dashboardActivity(from recentActivity: RecentActivity) -> DashboardActivity {
@@ -183,11 +196,9 @@ struct DashboardView: View {
                 name: recentActivity.applicationName,
                 bundleIdentifier: recentActivity.bundleIdentifier,
                 detail: "Recently active",
-                badgeTitle: isFocusApplication ? "Focus app" : "Recent app",
-                badgeColor: isFocusApplication ? GuardPalette.focused : GuardPalette.accent,
+                badgeTitle: isFocusApplication ? "In focus" : "Outside focus",
+                badgeColor: isFocusApplication ? GuardPalette.focused : GuardPalette.warning,
                 isCurrent: false,
-                isPlaceholder: false,
-                isWebsite: false,
                 browserURL: nil
             )
 
@@ -202,11 +213,11 @@ struct DashboardView: View {
                 badgeTitle = "Distracting site"
                 badgeColor = GuardPalette.alarm
             } else if isFocusApplication {
-                badgeTitle = "Focus app"
+                badgeTitle = "In focus"
                 badgeColor = GuardPalette.focused
             } else {
-                badgeTitle = "Not in your lists"
-                badgeColor = GuardPalette.accent
+                badgeTitle = "Outside focus"
+                badgeColor = GuardPalette.warning
             }
             return DashboardActivity(
                 id: "recent|\(recentActivity.id)",
@@ -216,8 +227,6 @@ struct DashboardView: View {
                 badgeTitle: badgeTitle,
                 badgeColor: badgeColor,
                 isCurrent: false,
-                isPlaceholder: false,
-                isWebsite: true,
                 browserURL: recentActivity.browserURL
             )
         }
@@ -229,16 +238,16 @@ struct DashboardView: View {
             return "Distracting site"
         }
         if store.containsFocusApplication(bundleIdentifier: context.bundleIdentifier) {
-            return "Focus app"
+            return "In focus"
         }
-        return "Not in your lists"
+        return "Outside focus"
     }
 
     private var classificationColor: Color {
         switch contextClassification {
         case "Distracting site": GuardPalette.alarm
-        case "Focus app": GuardPalette.focused
-        default: GuardPalette.accent
+        case "In focus": GuardPalette.focused
+        default: GuardPalette.warning
         }
     }
 
@@ -246,17 +255,12 @@ struct DashboardView: View {
         guard let context = displayContext else { return nil }
         if let host = context.browserURL?.host {
             return store.containsDistractingSite(host)
-                ? "Open distracting sites"
+                ? nil
                 : "Mark site as distracting"
         }
         return store.containsFocusApplication(bundleIdentifier: context.bundleIdentifier)
-            ? "Open focus apps"
-            : "Add app to focus"
-    }
-
-    private var contextActionColor: Color {
-        guard let context = displayContext else { return GuardPalette.accent }
-        return context.browserURL?.host == nil ? GuardPalette.focused : GuardPalette.alarm
+            ? nil
+            : "Add to focus apps"
     }
 
     private func performContextAction() {
@@ -281,8 +285,7 @@ struct DashboardView: View {
     }
 
     private func openActivity(_ activity: DashboardActivity) {
-        guard !activity.isPlaceholder,
-              let bundleIdentifier = activity.bundleIdentifier else { return }
+        guard let bundleIdentifier = activity.bundleIdentifier else { return }
 
         let workspace = NSWorkspace.shared
         let applicationURL = workspace.urlForApplication(withBundleIdentifier: bundleIdentifier)
@@ -340,114 +343,11 @@ private struct DashboardActivity: Identifiable {
     let badgeTitle: String
     let badgeColor: Color
     let isCurrent: Bool
-    let isPlaceholder: Bool
-    let isWebsite: Bool
     let browserURL: URL?
 }
 
-private struct AuroraActivityScene: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    let presentation: GuardStatusPresentation
-    @Binding var monitoringEnabled: Bool
-    let guardControlDisabled: Bool
-    let activities: [DashboardActivity]
-    let actionTitle: String?
-    let actionColor: Color
-    let action: () -> Void
-    let openActivity: (DashboardActivity) -> Void
-
-    var body: some View {
-        ZStack {
-            AuroraBackdrop(presentation: presentation)
-
-            VStack(spacing: 19) {
-                statusHeader
-                PerspectiveActivityStack(
-                    activities: activities,
-                    actionTitle: actionTitle,
-                    actionColor: actionColor,
-                    action: action,
-                    openActivity: openActivity
-                )
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 22)
-            .padding(.bottom, 20)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 386)
-        .animation(
-            reduceMotion ? nil : .easeInOut(duration: 0.24),
-            value: activities.map(\.id)
-        )
-        .accessibilityElement(children: .contain)
-    }
-
-    private var statusHeader: some View {
-        HStack(spacing: 14) {
-            GuardMark(
-                presentation: presentation,
-                size: 39,
-                gateColor: .white.opacity(0.82),
-                coreColor: .white
-            )
-
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 8) {
-                    Text(presentation.title)
-                        .font(.system(size: 21, weight: .semibold, design: .rounded))
-                    if let shortValue = presentation.shortValue {
-                        Text(shortValue)
-                            .font(.subheadline.weight(.bold).monospacedDigit())
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(.white.opacity(0.14), in: Capsule())
-                    }
-                }
-                Text(presentation.detail)
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.72))
-                    .lineLimit(1)
-            }
-            .foregroundStyle(.white)
-
-            Spacer(minLength: 12)
-
-            Toggle(isOn: $monitoringEnabled) {
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text("Guard mode")
-                        .font(.caption.weight(.semibold))
-                    Text(monitoringEnabled ? "On" : "Paused")
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.68))
-                }
-                .foregroundStyle(.white)
-            }
-            .toggleStyle(.switch)
-            .tint(presentation.color)
-            .disabled(guardControlDisabled)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(.black.opacity(0.18), in: Capsule())
-            .help(
-                guardControlDisabled
-                    ? "Return to a focus activity before pausing Guard."
-                    : "Turn focus reminders on or off."
-            )
-            .accessibilityHint(
-                guardControlDisabled
-                    ? "Return to a focus activity before pausing Guard."
-                    : "Turns focus reminders on or off."
-            )
-        }
-    }
-}
-
 private struct AuroraBackdrop: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @State private var isDrifting = false
 
     let presentation: GuardStatusPresentation
 
@@ -468,7 +368,7 @@ private struct AuroraBackdrop: View {
                     color: presentation.gradientColors[0],
                     width: proxy.size.width * 0.72,
                     height: proxy.size.height * 0.62,
-                    x: isDrifting ? -proxy.size.width * 0.16 : -proxy.size.width * 0.27,
+                    x: -proxy.size.width * 0.27,
                     y: -proxy.size.height * 0.18,
                     blur: reduceTransparency ? 42 : 62,
                     opacity: reduceTransparency ? 0.60 : 0.86
@@ -478,7 +378,7 @@ private struct AuroraBackdrop: View {
                     color: presentation.gradientColors[1],
                     width: proxy.size.width * 0.80,
                     height: proxy.size.height * 0.72,
-                    x: isDrifting ? proxy.size.width * 0.18 : proxy.size.width * 0.28,
+                    x: proxy.size.width * 0.28,
                     y: proxy.size.height * 0.02,
                     blur: reduceTransparency ? 46 : 68,
                     opacity: reduceTransparency ? 0.54 : 0.78
@@ -488,7 +388,7 @@ private struct AuroraBackdrop: View {
                     color: presentation.gradientColors[2],
                     width: proxy.size.width * 0.68,
                     height: proxy.size.height * 0.58,
-                    x: isDrifting ? proxy.size.width * 0.05 : -proxy.size.width * 0.08,
+                    x: -proxy.size.width * 0.08,
                     y: proxy.size.height * 0.30,
                     blur: reduceTransparency ? 44 : 66,
                     opacity: reduceTransparency ? 0.48 : 0.72
@@ -498,7 +398,7 @@ private struct AuroraBackdrop: View {
                     color: presentation.color,
                     width: proxy.size.width * 0.44,
                     height: proxy.size.height * 0.42,
-                    x: isDrifting ? proxy.size.width * 0.30 : proxy.size.width * 0.15,
+                    x: proxy.size.width * 0.15,
                     y: proxy.size.height * 0.30,
                     blur: reduceTransparency ? 38 : 58,
                     opacity: reduceTransparency ? 0.44 : 0.68
@@ -506,13 +406,7 @@ private struct AuroraBackdrop: View {
             }
             .compositingGroup()
         }
-        .animation(
-            reduceMotion ? nil : .easeInOut(duration: 16).repeatForever(autoreverses: true),
-            value: isDrifting
-        )
-        .animation(.easeInOut(duration: reduceMotion ? 0 : 0.35), value: presentation.kind)
-        .onAppear { updateMotion() }
-        .onChange(of: reduceMotion) { _ in updateMotion() }
+        .opacity(reduceTransparency ? 0 : 1)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
@@ -541,171 +435,54 @@ private struct AuroraBackdrop: View {
             .offset(x: x, y: y)
             .blendMode(.screen)
     }
-
-    private func updateMotion() {
-        isDrifting = !reduceMotion
-    }
 }
 
-private struct PerspectiveActivityStack: View {
-    @State private var hoveredActivityID: DashboardActivity.ID?
-
-    let activities: [DashboardActivity]
-    let actionTitle: String?
-    let actionColor: Color
-    let action: () -> Void
-    let openActivity: (DashboardActivity) -> Void
-
-    var body: some View {
-        VStack(spacing: 7) {
-            ForEach(activities) { activity in
-                let depth = activities.firstIndex(where: { $0.id == activity.id }) ?? 0
-                let isHovering = hoveredActivityID == activity.id
-                PerspectiveActivityRow(
-                    activity: activity,
-                    depth: depth,
-                    isHovering: isHovering,
-                    actionTitle: activity.isCurrent ? actionTitle : nil,
-                    actionColor: actionColor,
-                    action: action,
-                    openActivity: { openActivity(activity) },
-                    onHover: { hovering in
-                        if hovering, !activity.isPlaceholder {
-                            hoveredActivityID = activity.id
-                        } else if hoveredActivityID == activity.id {
-                            hoveredActivityID = nil
-                        }
-                    }
-                )
-                .scaleEffect(isHovering ? 1.015 : 1 - CGFloat(depth) * 0.045)
-                .rotation3DEffect(
-                    .degrees(isHovering ? 0 : Double(depth) * -1.6),
-                    axis: (x: 1, y: 0, z: 0),
-                    anchor: .center,
-                    perspective: 0.42
-                )
-                .opacity(isHovering ? 1 : 1 - Double(depth) * 0.18)
-                .offset(y: isHovering ? -4 : 0)
-                .shadow(
-                    color: .black.opacity(isHovering ? 0.34 : 0),
-                    radius: isHovering ? 18 : 0,
-                    y: isHovering ? 10 : 0
-                )
-                .zIndex(isHovering ? 100 : Double(activities.count - depth))
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 274, alignment: .top)
-        .animation(.easeOut(duration: 0.18), value: hoveredActivityID)
-    }
-}
-
-private struct PerspectiveActivityRow: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isFloating = false
-
+private struct DashboardActivityRow: View {
+    @State private var isHovering = false
     let activity: DashboardActivity
-    let depth: Int
-    let isHovering: Bool
-    let actionTitle: String?
-    let actionColor: Color
-    let action: () -> Void
     let openActivity: () -> Void
-    let onHover: (Bool) -> Void
 
     var body: some View {
-        HStack(spacing: 13) {
-            Button(action: openActivity) {
-                HStack(spacing: 13) {
-                    activityIcon
+        Button(action: openActivity) {
+            HStack(spacing: 12) {
+                if let bundleIdentifier = activity.bundleIdentifier {
+                    ApplicationIcon(bundleIdentifier: bundleIdentifier, size: activity.isCurrent ? 36 : 30)
+                } else {
+                    Image(systemName: "clock")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 36, height: 36)
+                }
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(activity.name)
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
-                        Text(activity.detail)
-                            .font(activity.isWebsite ? .caption.monospaced() : .caption)
-                            .foregroundStyle(.white.opacity(0.66))
-                            .lineLimit(1)
-                    }
-                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(activity.name)
+                        .font(.system(size: activity.isCurrent ? 15 : 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text(activity.detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
+                if activity.bundleIdentifier != nil {
                     StatusBadge(title: activity.badgeTitle, color: activity.badgeColor)
-                        .fixedSize()
-
-                    if !activity.isPlaceholder {
-                        Image(systemName: "arrow.up.forward.app")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white.opacity(isHovering ? 0.82 : 0.46))
-                    }
+                    Image(systemName: "arrow.up.forward.app")
+                        .font(.caption)
+                        .foregroundStyle(isHovering ? .primary : .secondary)
                 }
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .disabled(activity.isPlaceholder)
-            .help(activity.isPlaceholder ? "" : "Switch to \(activity.name)")
-
-            if let actionTitle {
-                Button(action: action) {
-                    Label(
-                        actionTitle,
-                        systemImage: activity.isWebsite
-                            ? "exclamationmark.shield"
-                            : "plus.app"
-                    )
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(actionColor)
-                .controlSize(.small)
-                .fixedSize()
-            }
+            .padding(.horizontal, 14)
+            .frame(minHeight: activity.isCurrent ? 68 : 54)
+            .background(isHovering ? Color.white.opacity(0.06) : .clear)
+            .contentShape(RoundedRectangle(cornerRadius: 14))
         }
-        .padding(.horizontal, 14)
-        .frame(maxWidth: .infinity)
-        .frame(height: 62)
-        .background(
-            .black.opacity((activity.isCurrent ? 0.24 : 0.16) + (isHovering ? 0.08 : 0)),
-            in: RoundedRectangle(cornerRadius: 18)
-        )
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
-        .opacity(activity.isPlaceholder ? 0.72 : 1)
-        .offset(
-            x: reduceMotion || isHovering ? 0 : (isFloating ? floatingX : -floatingX),
-            y: reduceMotion || isHovering ? 0 : (isFloating ? -1.4 : 1.4)
-        )
-        .animation(
-            reduceMotion
-                ? nil
-                : .easeInOut(duration: 4.8 + Double(depth) * 0.65).repeatForever(autoreverses: true),
-            value: isFloating
-        )
-        .animation(.easeOut(duration: 0.16), value: isHovering)
-        .onAppear { updateFloatingState() }
-        .onChange(of: reduceMotion) { _ in updateFloatingState() }
-        .onHover(perform: onHover)
-        .accessibilityElement(children: .contain)
-    }
-
-    @ViewBuilder
-    private var activityIcon: some View {
-        if let bundleIdentifier = activity.bundleIdentifier {
-            ApplicationIcon(bundleIdentifier: bundleIdentifier, size: 36)
-        } else {
-            Image(systemName: activity.isPlaceholder ? "clock.arrow.circlepath" : "sparkles")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.78))
-                .frame(width: 36, height: 36)
-                .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 11))
-        }
-    }
-
-    private var floatingX: CGFloat {
-        depth.isMultiple(of: 2) ? 0.8 : -0.8
-    }
-
-    private func updateFloatingState() {
-        isFloating = !reduceMotion
+        .buttonStyle(.plain)
+        .guardCard(cornerRadius: 14)
+        .disabled(activity.bundleIdentifier == nil)
+        .onHover { isHovering = $0 }
+        .help(activity.bundleIdentifier == nil ? "Waiting for activity" : "Switch to \(activity.name)")
     }
 }
 

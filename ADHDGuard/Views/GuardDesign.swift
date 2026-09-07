@@ -101,8 +101,8 @@ struct GuardStatusPresentation: Equatable {
     ) {
         guard monitoringEnabled else {
             state = .paused
-            title = "Paused"
-            detail = "Reminders are paused. Activity stays visible locally."
+            title = "Reminders are off"
+            detail = "Activity history still updates on this Mac."
             color = GuardPalette.paused
             progress = 1
             return
@@ -111,7 +111,7 @@ struct GuardStatusPresentation: Equatable {
         if remaining == 0 {
             state = .alarm
             title = "Refocus now"
-            detail = "Your focus buffer has ended."
+            detail = "Return to a focus app to end the reminder."
             color = GuardPalette.alarm
             progress = 1
             return
@@ -119,7 +119,7 @@ struct GuardStatusPresentation: Equatable {
 
         if let remaining {
             state = .grace(remaining)
-            title = "\(remaining) seconds left"
+            title = "Reminder in \(remaining)s"
             detail = "You’re outside your focus zone."
             color = GuardPalette.warning
             progress = min(1, max(0.06, Double(remaining) / Double(max(1, graceSeconds))))
@@ -129,14 +129,14 @@ struct GuardStatusPresentation: Equatable {
         switch decision {
         case .focused:
             state = .focused
-            title = "Focused"
-            detail = "Guard is quietly watching your activity."
+            title = "In focus"
+            detail = "This activity is in your focus list."
             color = GuardPalette.focused
             progress = 1
         case .distracted:
             state = .grace(graceSeconds)
             title = "Outside focus"
-            detail = "Your focus buffer is ready to start."
+            detail = "The timer starts when you return to this activity."
             color = GuardPalette.warning
             progress = 1
         case nil:
@@ -313,55 +313,56 @@ struct GuardMark: View {
     }
 }
 
-struct CompactGuardStatus: View {
-    let presentation: GuardStatusPresentation
+/// Shared, explicit control for the same setting on both app surfaces.
+struct FocusModeControl: View {
+    @Binding var isOn: Bool
+    let isLocked: Bool
+    let graceSeconds: Int
+    let remaining: Int?
+    var compact = false
 
     var body: some View {
-        HStack(spacing: 12) {
-            Capsule()
-                .fill(
-                    LinearGradient(
-                        colors: presentation.gradientColors,
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: 5, height: 42)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(presentation.title)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .lineLimit(1)
-                Text(presentation.detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-            .layoutPriority(1)
-
-            HStack(spacing: 8) {
-                if let shortValue = presentation.shortValue {
-                    Text(shortValue)
-                        .font(.system(size: 16, weight: .bold, design: .rounded).monospacedDigit())
+        VStack(alignment: .leading, spacing: 9) {
+            Toggle(isOn: $isOn) {
+                HStack(spacing: 10) {
+                    Text("Focus mode")
+                        .font(compact ? .headline : .title2.weight(.semibold))
+                    Spacer(minLength: 8)
+                    Text(isOn ? "On" : "Off")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(isOn ? GuardPalette.focused : .secondary)
                 }
-
-                GuardMark(
-                    presentation: presentation,
-                    size: 24,
-                    gateColor: .secondary,
-                    coreColor: presentation.color
-                )
             }
-            .foregroundStyle(presentation.color)
-            .frame(minWidth: 30)
-            .fixedSize()
+            .toggleStyle(.switch)
+            .tint(GuardPalette.focused)
+            .controlSize(.regular)
+            .disabled(isLocked)
+            .accessibilityLabel("Focus mode")
+            .accessibilityHint(isLocked
+                ? "Return to a focus app before turning Focus mode off."
+                : "Turns focus reminders on or off.")
+            .help(isLocked
+                ? "Return to a focus app before turning Focus mode off."
+                : "Turn focus reminders on or off.")
+
+            Text("Reminders after \(graceSeconds)s outside your focus apps or on distracting sites.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if isOn, let remaining, remaining > 0 {
+                Label("Reminder in \(remaining)s", systemImage: "timer")
+                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(GuardPalette.warning)
+            }
+
+            if isLocked {
+                Label("Return to a focus app before turning Focus mode off.", systemImage: "lock")
+                    .font(.caption)
+                    .foregroundStyle(GuardPalette.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .padding(.horizontal, 13)
-        .frame(minHeight: 60)
-        .guardCard(cornerRadius: 16)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Guard status: \(presentation.accessibilityTitle). \(presentation.detail)")
     }
 }
 
