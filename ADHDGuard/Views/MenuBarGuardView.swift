@@ -7,6 +7,7 @@ struct MenuBarGuardView: View {
     @EnvironmentObject private var monitor: GuardMonitor
     @EnvironmentObject private var alarm: AlarmController
     @EnvironmentObject private var navigation: GuardNavigation
+    @EnvironmentObject private var launchAtLogin: LaunchAtLoginController
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -88,6 +89,26 @@ struct MenuBarGuardView: View {
             }
 
             Divider()
+
+            Toggle("Launch at login", isOn: Binding(
+                get: { launchAtLogin.isEnabled },
+                set: { launchAtLogin.setEnabled($0) }
+            ))
+            .toggleStyle(.checkbox)
+
+            if launchAtLogin.requiresApproval {
+                Button("Allow in Login Items…", action: launchAtLogin.openLoginItemsSettings)
+                    .font(.caption)
+                    .buttonStyle(.borderless)
+            }
+
+            if let errorMessage = launchAtLogin.errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(GuardPalette.alarm)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             HStack {
                 Button("Open app") { open(.status) }
                     .buttonStyle(.bordered)
@@ -102,6 +123,7 @@ struct MenuBarGuardView: View {
         .padding(16)
         .frame(width: 340)
         .background(GuardPalette.canvasDark)
+        .onAppear { launchAtLogin.refresh(clearResolvedError: true) }
     }
 
     private var activityHeading: String {

@@ -32,7 +32,23 @@ struct ADHDGuardApp: App {
                 .environmentObject(navigation)
                 .environmentObject(launchAtLogin)
                 .preferredColorScheme(.dark)
-                .onAppear { monitor.start() }
+                .onAppear {
+                    monitor.start()
+                    launchAtLogin.prepareStartupPrompt()
+                }
+                .alert("Launch ADHD Guard at login?", isPresented: $launchAtLogin.showsStartupPrompt) {
+                    Button("Enable") {
+                        launchAtLogin.respondToStartupPrompt(enable: true)
+                        if launchAtLogin.requiresApproval || launchAtLogin.errorMessage != nil {
+                            navigation.selection = .settings
+                        }
+                    }
+                    Button("Not now", role: .cancel) {
+                        launchAtLogin.respondToStartupPrompt(enable: false)
+                    }
+                } message: {
+                    Text("Keep Guard ready whenever you sign in to your Mac. You can change this later in the menu bar or Settings.")
+                }
         }
         .defaultSize(width: 980, height: 680)
         .commands {
@@ -65,6 +81,7 @@ struct ADHDGuardApp: App {
                 .environmentObject(monitor)
                 .environmentObject(alarm)
                 .environmentObject(navigation)
+                .environmentObject(launchAtLogin)
                 .preferredColorScheme(.dark)
         } label: {
             MenuBarStatusIcon(presentation: menuBarPresentation)

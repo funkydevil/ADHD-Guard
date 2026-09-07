@@ -15,13 +15,17 @@ final class LaunchAtLoginController: ObservableObject {
     @Published private(set) var isEnabled = false
     @Published private(set) var requiresApproval = false
     @Published private(set) var errorMessage: String?
+    @Published var showsStartupPrompt = false
 
     private let service: any LaunchAtLoginServicing
+    private let defaults: UserDefaults
+    private let startupPromptHandledKey = "adhd-guard.launch-at-login-prompt-handled.v1"
     private var appActivationCancellable: AnyCancellable?
     private var requestedEnabled: Bool?
 
-    init(service: any LaunchAtLoginServicing = SMAppService.mainApp) {
+    init(service: any LaunchAtLoginServicing = SMAppService.mainApp, defaults: UserDefaults = .standard) {
         self.service = service
+        self.defaults = defaults
         refresh()
 
         appActivationCancellable = NotificationCenter.default
@@ -32,7 +36,27 @@ final class LaunchAtLoginController: ObservableObject {
             }
     }
 
+    func prepareStartupPrompt() {
+        refresh()
+        guard !defaults.bool(forKey: startupPromptHandledKey) else { return }
+        if isEnabled {
+            defaults.set(true, forKey: startupPromptHandledKey)
+            return
+        }
+        showsStartupPrompt = true
+    }
+
+    func respondToStartupPrompt(enable: Bool) {
+        showsStartupPrompt = false
+        defaults.set(true, forKey: startupPromptHandledKey)
+        if enable {
+            setEnabled(true)
+        }
+    }
+
     func setEnabled(_ enabled: Bool) {
+        defaults.set(true, forKey: startupPromptHandledKey)
+        showsStartupPrompt = false
         errorMessage = nil
         requestedEnabled = enabled
 

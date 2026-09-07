@@ -498,9 +498,17 @@ struct ApplicationIcon: View {
     let bundleIdentifier: String
     var size: CGFloat = 34
 
+    // Load our icon directly: Launch Services may resolve an older installed build.
+    private static let ownIcon = Bundle.main.url(forResource: "AppIcon-1024", withExtension: "png")
+        .flatMap { NSImage(contentsOf: $0) }
+
     var body: some View {
         Group {
-            if let applicationURL = NSWorkspace.shared.urlForApplication(
+            if bundleIdentifier.caseInsensitiveCompare(Bundle.main.bundleIdentifier ?? "com.funkydevil.ADHDGuard") == .orderedSame,
+               let ownIcon = Self.ownIcon {
+                Image(nsImage: ownIcon)
+                    .resizable()
+            } else if let applicationURL = NSWorkspace.shared.urlForApplication(
                 withBundleIdentifier: bundleIdentifier
             ) {
                 Image(nsImage: NSWorkspace.shared.icon(forFile: applicationURL.path))

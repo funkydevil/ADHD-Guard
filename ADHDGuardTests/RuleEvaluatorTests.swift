@@ -493,9 +493,84 @@ final class GuardSessionStateTests: XCTestCase {
 
 @MainActor
 final class LaunchAtLoginControllerTests: XCTestCase {
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "LaunchAtLoginControllerTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)!
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        suiteName = nil
+        super.tearDown()
+    }
+
+    func testFirstLaunchAsksWithoutRegistering() {
+        let service = LaunchAtLoginServiceFake(status: .notRegistered)
+        let controller = LaunchAtLoginController(service: service, defaults: defaults)
+
+        controller.prepareStartupPrompt()
+
+        XCTAssertTrue(controller.showsStartupPrompt)
+        XCTAssertEqual(service.registerCallCount, 0)
+    }
+
+    func testDecliningPromptIsRememberedAcrossLaunches() {
+        let service = LaunchAtLoginServiceFake(status: .notRegistered)
+        let controller = LaunchAtLoginController(service: service, defaults: defaults)
+        controller.prepareStartupPrompt()
+        controller.respondToStartupPrompt(enable: false)
+        let relaunched = LaunchAtLoginController(service: service, defaults: defaults)
+        relaunched.prepareStartupPrompt()
+
+        XCTAssertFalse(controller.showsStartupPrompt)
+        XCTAssertFalse(relaunched.showsStartupPrompt)
+        XCTAssertEqual(service.registerCallCount, 0)
+    }
+
+    func testAcceptingPromptRegistersAndExposesRequiredApproval() {
+        let service = LaunchAtLoginServiceFake(status: .notRegistered)
+        service.statusAfterRegister = .requiresApproval
+        let controller = LaunchAtLoginController(service: service, defaults: defaults)
+        controller.prepareStartupPrompt()
+        controller.respondToStartupPrompt(enable: true)
+
+        XCTAssertFalse(controller.showsStartupPrompt)
+        XCTAssertEqual(service.registerCallCount, 1)
+        XCTAssertTrue(controller.requiresApproval)
+    }
+
+    func testExistingLoginItemDoesNotPromptEvenIfLaterDisabled() {
+        for status in [SMAppService.Status.enabled, .requiresApproval] {
+            defaults.removePersistentDomain(forName: suiteName)
+            let service = LaunchAtLoginServiceFake(status: status)
+            let controller = LaunchAtLoginController(service: service, defaults: defaults)
+            controller.prepareStartupPrompt()
+            XCTAssertFalse(controller.showsStartupPrompt)
+
+            service.status = .notRegistered
+            let relaunched = LaunchAtLoginController(service: service, defaults: defaults)
+            relaunched.prepareStartupPrompt()
+            XCTAssertFalse(relaunched.showsStartupPrompt)
+        }
+    }
+
+    func testManualChoicePreventsStartupPrompt() {
+        let service = LaunchAtLoginServiceFake(status: .notRegistered)
+        let controller = LaunchAtLoginController(service: service, defaults: defaults)
+        controller.setEnabled(false)
+        controller.prepareStartupPrompt()
+
+        XCTAssertFalse(controller.showsStartupPrompt)
+    }
+
     func testNotFoundStatusDoesNotShowAnErrorBeforeRegistrationIsAttempted() {
         let service = LaunchAtLoginServiceFake(status: .notFound)
-        let controller = LaunchAtLoginController(service: service)
+        let controller = LaunchAtLoginController(service: service, defaults: defaults)
 
         XCTAssertFalse(controller.isEnabled)
         XCTAssertNil(controller.errorMessage)
@@ -504,7 +579,7 @@ final class LaunchAtLoginControllerTests: XCTestCase {
     func testNotFoundStatusCanRecoverByRegistering() {
         let service = LaunchAtLoginServiceFake(status: .notFound)
         service.statusAfterRegister = .enabled
-        let controller = LaunchAtLoginController(service: service)
+        let controller = LaunchAtLoginController(service: service, defaults: defaults)
 
         controller.setEnabled(true)
 
@@ -516,7 +591,7 @@ final class LaunchAtLoginControllerTests: XCTestCase {
     func testRegistrationFailureShowsAnActionableErrorOnlyAfterAttempt() {
         let service = LaunchAtLoginServiceFake(status: .notFound)
         service.registerError = LaunchAtLoginTestError.denied
-        let controller = LaunchAtLoginController(service: service)
+        let controller = LaunchAtLoginController(service: service, defaults: defaults)
 
         controller.setEnabled(true)
 
