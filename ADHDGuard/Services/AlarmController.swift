@@ -7,7 +7,7 @@ import SwiftUI
 final class AlarmController: NSObject, ObservableObject, NSWindowDelegate {
     @Published private(set) var activeAlarm: AlarmPresentation?
 
-    private let panelSize = NSSize(width: 560, height: 72)
+    private let panelSize = NSSize(width: 560, height: 132)
     private let panelEdgeInset: CGFloat = 16
     private let panelPositionKeyPrefix = "adhd-guard.alarm-position."
     private let speechSynthesizer = NSSpeechSynthesizer()
@@ -102,13 +102,12 @@ final class AlarmController: NSObject, ObservableObject, NSWindowDelegate {
                 self?.returnToFocusAction?()
                 return
             }
-            panel.contentView = DraggableHostingView(
+            panel.contentView = NSHostingView(
                 rootView: AlarmOverlayView(
                     alarm: alarm,
                     onReturnToFocus: returnToFocus
                 )
-                .preferredColorScheme(.dark),
-                onClick: returnToFocus
+                .preferredColorScheme(.dark)
             )
             position(panel, on: screen, identifier: identifier)
             panel.orderFrontRegardless()
@@ -140,7 +139,7 @@ final class AlarmController: NSObject, ObservableObject, NSWindowDelegate {
         panel.hasShadow = true
         panel.ignoresMouseEvents = false
         panel.isMovable = true
-        panel.isMovableByWindowBackground = true
+        panel.isMovableByWindowBackground = false
         panel.isReleasedWhenClosed = false
         panel.animationBehavior = .none
         panel.delegate = self
@@ -300,50 +299,5 @@ final class AlarmController: NSObject, ObservableObject, NSWindowDelegate {
         } else {
             AudioServicesPlayAlertSound(kSystemSoundID_UserPreferredAlert)
         }
-    }
-}
-
-private final class DraggableHostingView<Content: View>: NSHostingView<Content> {
-    private let onClick: () -> Void
-
-    init(rootView: Content, onClick: @escaping () -> Void) {
-        self.onClick = onClick
-        super.init(rootView: rootView)
-    }
-
-    @available(*, unavailable)
-    required init(rootView: Content) {
-        fatalError("init(rootView:) is unavailable")
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) is unavailable")
-    }
-
-    override var mouseDownCanMoveWindow: Bool { false }
-
-    override func mouseDown(with event: NSEvent) {
-        guard let window else { return }
-        let originalPointerLocation = NSEvent.mouseLocation
-        window.performDrag(with: event)
-
-        if AlarmPointerInteraction.isClick(
-            from: originalPointerLocation,
-            to: NSEvent.mouseLocation
-        ) {
-            onClick()
-        }
-    }
-}
-
-enum AlarmPointerInteraction {
-    private static let maximumClickTravel: CGFloat = 0.75
-
-    static func isClick(from originalOrigin: NSPoint, to currentOrigin: NSPoint) -> Bool {
-        hypot(
-            currentOrigin.x - originalOrigin.x,
-            currentOrigin.y - originalOrigin.y
-        ) < maximumClickTravel
     }
 }

@@ -446,21 +446,6 @@ final class GuardSessionStateTests: XCTestCase {
         XCTAssertTrue(script.contains("set active tab index"))
     }
 
-    func testAlarmPointerInteractionDistinguishesClickFromDrag() {
-        XCTAssertTrue(
-            AlarmPointerInteraction.isClick(
-                from: CGPoint(x: 100, y: 100),
-                to: CGPoint(x: 100.5, y: 100)
-            )
-        )
-        XCTAssertFalse(
-            AlarmPointerInteraction.isClick(
-                from: CGPoint(x: 100, y: 100),
-                to: CGPoint(x: 101, y: 100)
-            )
-        )
-    }
-
     func testMenuBarStatusIconProducesTemplateImage() throws {
         let image = MenuBarStatusIcon.templateImage(for: .paused)
         let tiffData = try XCTUnwrap(image.tiffRepresentation)
@@ -797,5 +782,72 @@ final class GuardMonitorLockScreenTests: XCTestCase {
         defer { alarm.dismiss() }
         let monitor = GuardMonitor(store: store, alarm: alarm, defaults: defaults, screenLockStatus: lockStatus)
         body(monitor, alarm)
+    }
+}
+
+
+@MainActor
+final class AlarmDragViewTests: XCTestCase {
+    func testDragMovesInactivePanelWithoutActivatingIt() throws {
+        let (panel, view) = makePanel()
+        let originalOrigin = panel.frame.origin
+        let down = try event(.leftMouseDown, point: NSPoint(x: 60, y: 40), panel: panel)
+
+        view.mouseDown(with: down)
+        XCTAssertEqual(panel.frame.origin, originalOrigin)
+
+        view.mouseDragged(with: try event(
+            .leftMouseDragged, point: NSPoint(x: 90, y: 55), panel: panel
+        ))
+
+        XCTAssertEqual(panel.frame.origin.x, originalOrigin.x + 30, accuracy: 0.1)
+        XCTAssertEqual(panel.frame.origin.y, originalOrigin.y + 15, accuracy: 0.1)
+        XCTAssertTrue(view.acceptsFirstMouse(for: down))
+        XCTAssertFalse(panel.isKeyWindow)
+    }
+
+    func testDragCanReturnToItsOriginAndReleaseEndsTheGesture() throws {
+        let (panel, view) = makePanel()
+        let originalOrigin = panel.frame.origin
+        view.mouseDown(with: try event(.leftMouseDown, point: NSPoint(x: 60, y: 40), panel: panel))
+        view.mouseDragged(with: try event(.leftMouseDragged, point: NSPoint(x: 90, y: 55), panel: panel))
+        // The pointer returns to its original screen point, now relative to the moved window.
+        view.mouseDragged(with: try event(.leftMouseDragged, point: NSPoint(x: 30, y: 25), panel: panel))
+        XCTAssertEqual(panel.frame.origin, originalOrigin)
+
+        view.mouseUp(with: try event(.leftMouseUp, point: NSPoint(x: 60, y: 40), panel: panel))
+        view.mouseDragged(with: try event(.leftMouseDragged, point: NSPoint(x: 100, y: 70), panel: panel))
+        XCTAssertEqual(panel.frame.origin, originalOrigin)
+        XCTAssertFalse(panel.isKeyWindow)
+    }
+
+    func testClickOnDragRegionLeavesPanelContentAndPositionUnchanged() throws {
+        let (panel, view) = makePanel()
+        let originalOrigin = panel.frame.origin
+        view.mouseDown(with: try event(.leftMouseDown, point: NSPoint(x: 60, y: 40), panel: panel))
+        view.mouseUp(with: try event(.leftMouseUp, point: NSPoint(x: 60, y: 40), panel: panel))
+        XCTAssertEqual(panel.frame.origin, originalOrigin)
+        XCTAssertTrue(panel.contentView === view)
+    }
+
+    private func makePanel() -> (NSPanel, AlarmDragView) {
+        let panel = NSPanel(
+            contentRect: NSRect(x: 100, y: 100, width: 560, height: 132),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isMovableByWindowBackground = false
+        let view = AlarmDragView(frame: panel.contentLayoutRect)
+        panel.contentView = view
+        return (panel, view)
+    }
+
+    private func event(_ type: NSEvent.EventType, point: NSPoint, panel: NSPanel) throws -> NSEvent {
+        try XCTUnwrap(NSEvent.mouseEvent(
+            with: type, location: point,
+            modifierFlags: [], timestamp: 1, windowNumber: panel.windowNumber,
+            context: nil, eventNumber: 1, clickCount: 1, pressure: 1
+        ))
     }
 }

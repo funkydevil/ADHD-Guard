@@ -67,10 +67,7 @@ struct RootView: View {
             GuardAuraBackground()
 
             HStack(spacing: 0) {
-                GlassNavigationRail(
-                    selection: $navigation.selection,
-                    presentation: presentation
-                )
+                GlassNavigationRail(selection: $navigation.selection)
                     .frame(width: 176)
 
                 ZStack {
@@ -109,26 +106,17 @@ struct RootView: View {
             )
     }
 
-    private var presentation: GuardStatusPresentation {
-        GuardStatusPresentation(
-            monitoringEnabled: store.configuration.monitoringEnabled,
-            decision: monitor.lastDecision,
-            remaining: monitor.distractionRemaining,
-            graceSeconds: store.configuration.distractionGraceSeconds
-        )
-    }
+
 }
 
 private struct GlassNavigationRail: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Binding var selection: GuardSection
-    let presentation: GuardStatusPresentation
-    @Namespace private var selectionNamespace
+    @State private var hoveredSection: GuardSection?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            VStack(spacing: 8) {
+            VStack(spacing: 4) {
                 ForEach(GuardSection.allCases) { section in
                     navigationButton(section)
                 }
@@ -136,7 +124,8 @@ private struct GlassNavigationRail: View {
 
             Spacer()
         }
-        .padding(18)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 18)
         .background {
             if reduceTransparency {
                 Rectangle()
@@ -165,48 +154,37 @@ private struct GlassNavigationRail: View {
     }
 
     private func navigationButton(_ section: GuardSection) -> some View {
-        Button {
-            withAnimation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.82)) {
-                selection = section
-            }
+        let isSelected = selection == section
+        return Button {
+            selection = section
         } label: {
-            HStack(spacing: 11) {
-                Group {
-                    if section == .status {
-                        GuardMark(
-                            presentation: presentation,
-                            size: 18,
-                            gateColor: selection == section ? .primary : .secondary,
-                            coreColor: presentation.color
-                        )
-                    } else {
-                        Image(systemName: section.symbol)
-                            .font(.system(size: 15, weight: .semibold))
-                    }
-                }
-                .frame(width: 20)
+            HStack(spacing: 10) {
+                Image(systemName: section.symbol)
+                    .font(.system(size: 15, weight: .medium))
+                    .frame(width: 20, height: 20)
+                    .foregroundStyle(isSelected ? GuardPalette.focused : .secondary)
                 Text(section.title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(selection == section ? Color.primary : Color.secondary)
+            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
             .padding(.horizontal, 12)
-            .frame(height: 44)
+            .frame(height: 40)
             .background {
-                if selection == section {
-                    Capsule()
-                        .fill(GuardPalette.accent.opacity(0.14))
-                        .overlay {
-                            Capsule().stroke(GuardPalette.accent.opacity(0.22), lineWidth: 1)
-                        }
-                        .matchedGeometryEffect(id: "rail-selection", in: selectionNamespace)
-                }
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isSelected
+                        ? GuardPalette.accent.opacity(0.16)
+                        : Color.primary.opacity(hoveredSection == section ? 0.05 : 0))
             }
-            .contentShape(Capsule())
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityAddTraits(selection == section ? .isSelected : [])
+        .onHover { isHovering in
+            hoveredSection = isHovering ? section : nil
+        }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
+
 }
 
 private struct RulesView: View {
