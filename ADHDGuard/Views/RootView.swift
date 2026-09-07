@@ -128,8 +128,6 @@ private struct GlassNavigationRail: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            brand
-
             VStack(spacing: 8) {
                 ForEach(GuardSection.allCases) { section in
                     navigationButton(section)
@@ -164,33 +162,6 @@ private struct GlassNavigationRail: View {
                 .fill(Color.primary.opacity(0.055))
                 .frame(width: 1)
         }
-    }
-
-    private var brand: some View {
-        HStack(spacing: 10) {
-            GuardMark(
-                presentation: presentation,
-                size: 23,
-                gateColor: .white.opacity(0.9),
-                coreColor: .white
-            )
-                .frame(width: 34, height: 34)
-                .background(
-                    LinearGradient(
-                        colors: [GuardPalette.accent, GuardPalette.accent.opacity(0.68)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    in: RoundedRectangle(cornerRadius: 11, style: .continuous)
-                )
-                .shadow(color: GuardPalette.accent.opacity(0.32), radius: 12, y: 5)
-
-            Text("ADHD\nGuard")
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .fixedSize()
-        }
-        .padding(.horizontal, 8)
-        .padding(.bottom, 2)
     }
 
     private func navigationButton(_ section: GuardSection) -> some View {

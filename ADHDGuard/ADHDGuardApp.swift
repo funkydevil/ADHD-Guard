@@ -25,6 +25,7 @@ struct ADHDGuardApp: App {
     var body: some Scene {
         Window("ADHD Guard", id: "main") {
             RootView()
+                .background(HiddenWindowTitle())
                 .environmentObject(store)
                 .environmentObject(alarm)
                 .environmentObject(monitor)
@@ -102,5 +103,22 @@ struct ADHDGuardApp: App {
             configuration: store.configuration,
             ownBundleIdentifier: Bundle.main.bundleIdentifier
         )
+    }
+}
+
+private struct HiddenWindowTitle: NSViewRepresentable {
+    func makeNSView(context: Context) -> TitleView {
+        TitleView()
+    }
+
+    func updateNSView(_ nsView: TitleView, context: Context) {
+        nsView.window?.titleVisibility = .hidden
+    }
+
+    final class TitleView: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            window?.titleVisibility = .hidden
+        }
     }
 }
