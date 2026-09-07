@@ -12,9 +12,14 @@ struct WebsiteRule: Codable, Identifiable, Equatable {
 }
 
 struct GuardConfiguration: Codable, Equatable {
+    static let socialWebsiteRules: [WebsiteRule] = [
+        WebsiteRule(host: "instagram.com"),
+        WebsiteRule(host: "facebook.com")
+    ]
+
     static let defaultWebsiteRules: [WebsiteRule] = [
         WebsiteRule(host: "youtube.com")
-    ]
+    ] + socialWebsiteRules
 
     static let browserApplicationRules: [ApplicationRule] = [
         ApplicationRule(name: "Safari", bundleIdentifier: "com.apple.Safari"),

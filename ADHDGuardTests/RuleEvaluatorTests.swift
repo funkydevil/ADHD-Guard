@@ -599,6 +599,35 @@ final class ConfigurationStoreTests: XCTestCase {
         XCTAssertTrue(store.containsDistractingSite("old.reddit.com"))
     }
 
+    func testSocialSitesAreAddedOnceWithoutDuplicatesOrRestoringRemovedYouTube() throws {
+        let suiteName = "ADHDGuardTests.SocialSites.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(true, forKey: "adhd-guard.migration.browser-rules.v1")
+        defaults.set(true, forKey: "adhd-guard.migration.default-website-rules.v1")
+
+        let existingFacebook = WebsiteRule(host: "www.FACEBOOK.com")
+        var saved = GuardConfiguration.defaults
+        saved.websiteRules = [existingFacebook, WebsiteRule(host: "custom.example")]
+        defaults.set(try JSONEncoder().encode(saved), forKey: "adhd-guard.configuration.v1")
+
+        let store = ConfigurationStore(defaults: defaults)
+        XCTAssertEqual(store.configuration.websiteRules.count, 3)
+        XCTAssertEqual(store.configuration.websiteRules.first, existingFacebook)
+        XCTAssertFalse(store.containsDistractingSite("youtube.com"))
+        XCTAssertTrue(store.containsDistractingSite("www.instagram.com"))
+        XCTAssertTrue(store.containsDistractingSite("m.facebook.com"))
+        XCTAssertFalse(store.containsDistractingSite("notfacebook.com"))
+        XCTAssertTrue(store.containsDistractingSite("custom.example"))
+
+        store.configuration.websiteRules.removeAll {
+            RuleEvaluator.normalizedHost(from: $0.host) == "instagram.com"
+        }
+        let reloaded = ConfigurationStore(defaults: defaults)
+        XCTAssertFalse(reloaded.containsDistractingSite("instagram.com"))
+        XCTAssertEqual(reloaded.configuration.websiteRules.count, 2)
+    }
+
     func testDefaultWebsiteRulesAreMigratedOnceWithoutOverwritingLaterRemoval() throws {
         let suiteName = "ADHDGuardTests.ConfigurationStore.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -651,6 +680,7 @@ final class ConfigurationStoreTests: XCTestCase {
         defaults.set(true, forKey: "adhd-guard.migration.browser-rules.v1")
         defaults.set(true, forKey: "adhd-guard.migration.default-website-rules.v1")
 
+        defaults.set(true, forKey: "adhd-guard.migration.social-website-rules.v1")
         let store = ConfigurationStore(defaults: defaults)
 
         XCTAssertEqual(store.configuration.applicationRules.count, 1)

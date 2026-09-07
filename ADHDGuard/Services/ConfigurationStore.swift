@@ -11,6 +11,7 @@ final class ConfigurationStore: ObservableObject {
     private let storageKey = "adhd-guard.configuration.v1"
     private let browserRulesMigrationKey = "adhd-guard.migration.browser-rules.v1"
     private let defaultWebsiteRulesMigrationKey = "adhd-guard.migration.default-website-rules.v1"
+    private let socialWebsiteRulesMigrationKey = "adhd-guard.migration.social-website-rules.v1"
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
@@ -46,6 +47,18 @@ final class ConfigurationStore: ObservableObject {
                 }
             }
             defaults.set(true, forKey: defaultWebsiteRulesMigrationKey)
+        }
+
+        if !defaults.bool(forKey: socialWebsiteRulesMigrationKey) {
+            for rule in GuardConfiguration.socialWebsiteRules {
+                if !loadedConfiguration.websiteRules.contains(where: {
+                    RuleEvaluator.normalizedHost(from: $0.host) == rule.host
+                }) {
+                    loadedConfiguration.websiteRules.append(rule)
+                    addedDefaultWebsiteRules = true
+                }
+            }
+            defaults.set(true, forKey: socialWebsiteRulesMigrationKey)
         }
 
         configuration = loadedConfiguration
