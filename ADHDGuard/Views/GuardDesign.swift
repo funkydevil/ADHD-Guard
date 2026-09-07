@@ -2,12 +2,13 @@ import AppKit
 import SwiftUI
 
 enum GuardPalette {
-    static let accent = Color(red: 0.47, green: 0.41, blue: 1.00)
-    static let focused = Color(red: 0.18, green: 0.78, blue: 0.58)
+    static let accent = Color(red: 0.16, green: 0.75, blue: 0.65)
+    static let focused = Color(red: 0.22, green: 0.82, blue: 0.65)
     static let warning = Color(red: 0.95, green: 0.67, blue: 0.24)
     static let alarm = Color(red: 0.94, green: 0.36, blue: 0.43)
-    static let paused = Color(red: 0.55, green: 0.57, blue: 0.65)
-    static let canvasDark = Color(red: 0.055, green: 0.063, blue: 0.10)
+    static let paused = Color(red: 0.53, green: 0.61, blue: 0.59)
+    static let canvasDark = Color(red: 0.045, green: 0.075, blue: 0.068)
+    static let cloudBase = Color(red: 0.035, green: 0.12, blue: 0.10)
 }
 
 enum GuardVisualState: Equatable {
@@ -47,21 +48,21 @@ struct GuardStatusPresentation: Equatable {
         switch state {
         case .paused:
             [
-                Color(red: 0.32, green: 0.35, blue: 0.56),
-                Color(red: 0.20, green: 0.43, blue: 0.46),
-                Color(red: 0.42, green: 0.30, blue: 0.54)
+                Color(red: 0.31, green: 0.43, blue: 0.39),
+                Color(red: 0.24, green: 0.39, blue: 0.36),
+                Color(red: 0.36, green: 0.43, blue: 0.39)
             ]
         case .starting:
             [
-                Color(red: 0.39, green: 0.35, blue: 0.85),
-                Color(red: 0.32, green: 0.42, blue: 0.75),
-                Color(red: 0.25, green: 0.30, blue: 0.47)
+                Color(red: 0.13, green: 0.63, blue: 0.53),
+                Color(red: 0.17, green: 0.49, blue: 0.43),
+                Color(red: 0.20, green: 0.39, blue: 0.31)
             ]
         case .focused:
             [
                 Color(red: 0.13, green: 0.71, blue: 0.53),
-                Color(red: 0.18, green: 0.56, blue: 0.62),
-                Color(red: 0.38, green: 0.35, blue: 0.78)
+                Color(red: 0.08, green: 0.59, blue: 0.53),
+                Color(red: 0.29, green: 0.60, blue: 0.40)
             ]
         case .grace:
             [

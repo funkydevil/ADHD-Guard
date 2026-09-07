@@ -60,6 +60,7 @@ struct ADHDGuardApp: App {
 
         MenuBarExtra {
             MenuBarGuardView()
+                .tint(GuardPalette.accent)
                 .environmentObject(store)
                 .environmentObject(monitor)
                 .environmentObject(alarm)
@@ -72,6 +73,8 @@ struct ADHDGuardApp: App {
 
         Settings {
             PreferencesView()
+                .tint(GuardPalette.accent)
+                .background(GuardAuraBackground())
                 .environmentObject(store)
                 .environmentObject(alarm)
                 .environmentObject(monitor)

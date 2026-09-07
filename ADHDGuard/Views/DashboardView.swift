@@ -455,7 +455,7 @@ private struct AuroraBackdrop: View {
         GeometryReader { proxy in
             ZStack {
                 cloudBlob(
-                    color: Color(red: 0.045, green: 0.055, blue: 0.14),
+                    color: GuardPalette.cloudBase,
                     width: proxy.size.width * 1.14,
                     height: proxy.size.height * 1.04,
                     x: 0,
