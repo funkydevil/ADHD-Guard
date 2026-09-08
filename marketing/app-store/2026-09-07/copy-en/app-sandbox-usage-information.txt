@@ -1,0 +1,12 @@
+Needed to detect distracting websites inside a focus browser and return to a saved focus tab. Reads the frontmost tab URL to compare its host with local rules. On an explicit Return to focus action, finds and activates the saved tab or opens its URL.
+
+Targets (same use for each):
+com.apple.Safari - Safari
+com.google.Chrome - Chrome
+com.microsoft.edgemac - Edge
+com.brave.Browser - Brave
+company.thebrowser.Browser - Arc
+
+Requires macOS Automation consent. No page-content, password or history-database access. URLs stay local; no browsing activity is uploaded.
+
+Test in Safari or Chrome: add the browser to Focus apps and example.org to Distracting sites; set a 10-second buffer and enable Focus mode. Grant Automation permission. Visit a non-distracting page, then example.org. Wait over 10 seconds for the reminder; click Return to focus to activate the saved focused tab. Other listed browser integrations are implemented; documented runtime checks cover Safari and Chrome.

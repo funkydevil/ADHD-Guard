@@ -1,0 +1,32 @@
+Get back to what matters.
+
+You open a tab for a quick break. You switch apps to check one thing. ADHD Guard helps you notice when that detour takes you away from your task.
+
+Choose your focus apps and distracting websites, then turn on Focus mode. If you stay outside your focus apps or on a distracting site beyond your chosen buffer, a visible reminder prompts you to return. Optional sound and spoken reminders keep nudging you until you get back to focus.
+
+CHOOSE YOUR FOCUS APPS
+Build a list of the apps you want to work in. Add apps from recent activity or choose them from your Applications folder.
+
+CATCH YOUR DISTRACTING SITES
+Add the websites that tend to pull you away. Listed sites start the reminder timer even when your browser is a focus app. Matching subdomains are included.
+
+GIVE YOURSELF A MOMENT
+Set how long a detour can last before reminders begin. Switching between distracting apps and sites keeps the same timer running.
+
+RETURN TO YOUR TASK
+Use Return to focus to bring your last focused app or browser page back into view. Move the reminder banner to a spot that suits your workspace.
+
+MAKE REMINDERS YOUR OWN
+Choose a repeating chime, spoken reminders, or a visual reminder on its own. Write your own reminder phrases and preview them in Settings. Enable an optional idle reminder for periods without keyboard or mouse activity.
+
+KEEP IT CLOSE
+Turn Focus mode on or off from the menu bar, check recent activity, and choose to launch ADHD Guard when you log in.
+
+YOUR ACTIVITY STAYS LOCAL
+Focus rules, reminder settings, and a short recent activity list are stored on your Mac. The app does not upload your app or browsing activity. No account is required.
+
+Website reminders work with Safari and Google Chrome and require macOS Automation permission.
+
+For work, study, and the moments when you could use a reminder to come back.
+
+Support: kp.gentle.support@gmail.com

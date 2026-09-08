@@ -1,0 +1,26 @@
+ADHD Guard is a macOS productivity app that displays reminders when the active app is outside the user's focus list or the active browser tab matches a distracting website rule.
+
+No account or sign-in is required. No demo credentials are needed.
+
+To test an app reminder:
+1. Open Lists > Focus apps and add TextEdit using Choose an application.
+2. Open Settings and set Focus buffer to 10 seconds. Leave Idle reminder off for this test. Chime and Spoken reminder can be enabled or disabled independently.
+3. Turn on Focus mode.
+4. Use TextEdit briefly so that it becomes the last focused app.
+5. Open Calculator, ensuring Calculator is not in the focus list, and keep it frontmost for more than 10 seconds.
+6. A Time to refocus banner appears. Select Return to focus to return to TextEdit. The distraction reminder clears when focus resumes.
+
+To test a website reminder:
+1. Keep Safari in the focus-app list.
+2. Under Lists > Distracting sites, add example.org.
+3. Open a non-listed page such as apple.com in Safari to establish a focused page.
+4. Allow macOS Automation access when prompted.
+5. Open example.org and keep its tab active beyond the configured buffer.
+6. The reminder should appear even though Safari itself is a focus app. Return to focus selects the previous focused browser page; if the matching tab is no longer open, the app can reopen the saved URL.
+7. Turn Focus mode off to stop reminders. Recent activity still updates locally while the app is running.
+
+Browser website detection uses Apple Events and requires the user's macOS Automation consent. Safari and Google Chrome are suitable browsers for the review scenario. App-based reminders can be tested independently of browser permission.
+
+The build uses App Sandbox. The temporary Apple Events exception is restricted to Safari, Google Chrome, Microsoft Edge, Brave and Arc. It supports reading the active tab URL to evaluate local rules and searching open tab URLs when the user explicitly chooses to return to a saved website.
+
+No screen recording, Accessibility, microphone or full-disk access is requested. The app reads elapsed time since input events for optional idle reminders; it does not capture typed text. Selected application bundles are read only to obtain their names and bundle identifiers. Rules, preferences and a short recent activity list are stored locally. The app does not upload activity.

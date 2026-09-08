@@ -1,0 +1,89 @@
+{
+  "verifiedAt": "2026-09-07T22:50:00.584574+00:00",
+  "appId": "6809604180",
+  "platform": "MAC_OS",
+  "version": "1.0",
+  "locale": "en-US",
+  "listingUrl": "https://appstoreconnect.apple.com/apps/6809604180/distribution/macos/version/inflight",
+  "metadataChecks": {
+    "name": "exact match",
+    "subtitle": "exact match",
+    "privacyPolicyUrl": "exact match",
+    "description": "exact match",
+    "keywords": "exact match",
+    "promotionalText": "exact match",
+    "supportUrl": "exact match",
+    "reviewNotes": "exact match, includes sandbox explanation"
+  },
+  "category": "PRODUCTIVITY",
+  "copyright": "2026 Kirill Piulziu",
+  "screenshots": [
+    {
+      "id": "2b3ca3e1-4096-4832-947a-71791035b478",
+      "file": "01-refocus.png",
+      "state": "COMPLETE",
+      "width": 2560,
+      "height": 1600,
+      "checksumMatches": true
+    },
+    {
+      "id": "a91e5ac0-0349-48eb-a82a-c702305c687a",
+      "file": "02-focus-apps.png",
+      "state": "COMPLETE",
+      "width": 2560,
+      "height": 1600,
+      "checksumMatches": true
+    },
+    {
+      "id": "e44acc81-e6dd-43c2-be2a-7304d25cee70",
+      "file": "03-distracting-sites.png",
+      "state": "COMPLETE",
+      "width": 2560,
+      "height": 1600,
+      "checksumMatches": true
+    },
+    {
+      "id": "9923a3de-0c4a-4104-b71f-4fcc97895261",
+      "file": "04-reminder-settings.png",
+      "state": "COMPLETE",
+      "width": 2560,
+      "height": 1600,
+      "checksumMatches": true
+    }
+  ],
+  "versionState": "PREPARE_FOR_SUBMISSION",
+  "submittedForReview": false,
+  "remainingBeforeSubmission": [
+    "Attach the appropriate build",
+    "Fill App Review contact fields",
+    "Choose the price; awaiting user decision"
+  ],
+  "appSandboxInformation": {
+    "verifiedAt": "2026-09-07T22:59:55.706056+00:00",
+    "id": "80a84055-792c-4ed8-8bef-8cd038bbd044",
+    "entitlementKey": "com.apple.security.temporary-exception.apple-events",
+    "justification": "exact match: copy-en/app-sandbox-usage-information.txt"
+  },
+  "releaseDeclarations": {
+    "verifiedAt": "2026-09-07T23:10:10.876255+00:00",
+    "contentRightsDeclaration": "DOES_NOT_USE_THIRD_PARTY_CONTENT",
+    "appPrivacy": {
+      "dataProtection": "DATA_NOT_COLLECTED",
+      "published": true
+    },
+    "pricing": "Awaiting user choice"
+  },
+  "supportEmailUpdate": {
+    "email": "kp.gentle.support@gmail.com",
+    "reviewContact": "verified",
+    "publicDescription": "verified",
+    "verifiedAt": "2026-09-07T23:15:22.968599+00:00"
+  },
+  "marketingLandingPage": {
+    "url": "https://funkydevil.github.io/adhd-guard/",
+    "marketingUrl": "verified exact match",
+    "publicFiles": "HTTP 200, exact byte match",
+    "pagesCommit": "1720a403ecb3d7c09778d3f1386b66d54e9b187f",
+    "verifiedAt": "2026-09-07T23:23:17.132049+00:00"
+  }
+}

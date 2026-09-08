@@ -1,0 +1,9 @@
+ADHD Guard uses com.apple.security.temporary-exception.apple-events for these specific browser targets: com.apple.Safari, com.google.Chrome, com.microsoft.edgemac, com.brave.Browser and company.thebrowser.Browser.
+
+Website-based reminders need the URL of the current tab in the frontmost supported browser to compare its host against the user's local distracting-site rules. App identity alone cannot distinguish a focused page from a distracting website in the same browser.
+
+When the user explicitly selects Return to focus or a saved website, ADHD Guard searches the supported browser's open tab URLs for the saved URL and activates the matching tab. If it cannot find a matching tab, it can ask the browser to open the saved URL.
+
+The app does not read page contents, browser passwords or the browser history database, and does not change website content. Browser access requires macOS Automation consent. The exception targets are limited to the browsers implemented by the app; it does not grant unrestricted Apple Events access.
+
+URLs used for recent activity and focus return are handled locally. The app does not upload app or browsing activity.
